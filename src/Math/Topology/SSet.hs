@@ -2,86 +2,173 @@ module Math.Topology.SSet where
 
 import qualified Control.Category.Constrained as Constrained
 import Control.Monad (ap)
-import Data.Maybe (isJust)
+import Data.List
 import Prelude hiding (Bounded)
 
--- NOTE: This should be made much more efficient. First, it could be
--- flattened so that in a degenerate simplex you have immediate access
--- to the underlying non-degenerate simplex. Also, the list of ints is
--- always strictly decreasing, and so could be stored as a bit mask as
--- is done in Kenzo.  Can use pattern synonyms to make this
--- indistinguishable from what is used currently, but a lot of the
--- algorithms could then be done using bit operations.
+-- A degeneracy symbol is a list of positive integers.
+-- [3,4,2] means the map {0,...,8} -> {0,1,2} mapping the first three numbers
+-- to 0, the next four to 1, and the last two to 2.
+-- Trailing 1s are pruned, this is an invariant.
+-- Note that we don't store the dom/cod dimensions, only the difference!
+newtype DegenSymbol = DegenSymbol { dsymbol :: [Int] } deriving (Eq)
 
--- NOTE: Another idea for efficiency: the degeneracy operator should
--- be strict, but there should be a shortcut to determine whether a
--- simplex is degenerate or not without calculating the entire degeneracy
--- operator.
-data FormalDegen a
-  = NonDegen a
-  | Degen !Int (FormalDegen a)
+instance Show DegenSymbol where
+  show (DegenSymbol d) = show d
+
+primDegen :: Int -> DegenSymbol
+primDegen n = DegenSymbol $ replicate n 1 ++ [2] -- TODO more efficient
+
+-- They form a ValueCategory, but let's make less fuss
+instance Semigroup DegenSymbol where
+  -- p : [m] -> [n], q : [n] -> [k]
+  DegenSymbol [] <> q = q
+  p <> DegenSymbol [] = p
+  p <> DegenSymbol (x:xs) =
+    let (p1, p2) = splitAt x (dsymbol p) in
+      DegenSymbol (sum p1: p2 <> xs)
+
+instance Monoid DegenSymbol where
+  mempty = DegenSymbol []
+
+-- Dually, a face symbol is a list of natural numbers.
+-- [3,4,0] means a map {0,...,9} -> {0,...,7}, by discarding
+-- 3, 8 and 9, moving the others forward.
+
+newtype FaceSymbol = FaceSymbol { fsymbol :: [Int] } deriving (Eq)
+
+instance Show FaceSymbol where
+  show (FaceSymbol d) = show d
+
+-- TODO instance monoid facesymbol
+
+primFace :: Int -> FaceSymbol
+primFace n = FaceSymbol [n]
+
+-- exchanges --f-> --d-> to --d'-> --f'->
+(#) :: FaceSymbol -> DegenSymbol -> (DegenSymbol, FaceSymbol)
+FaceSymbol [] # d = (d, FaceSymbol [])
+f # DegenSymbol [] = (DegenSymbol [], f)
+FaceSymbol (i:f) # DegenSymbol (j:d)
+  | i >= j =
+    let (DegenSymbol d', FaceSymbol f') = FaceSymbol (i-j:f) # DegenSymbol d in
+    case f' of
+      []      -> (DegenSymbol (j:d'), FaceSymbol [])
+      (k:f'') -> (DegenSymbol (j:d'), FaceSymbol (k+1:f''))
+  | otherwise =
+    let d_reduced = if i == j+1 then d else (j-i-1:d) in
+    let u@(DegenSymbol d', FaceSymbol f') = FaceSymbol f # DegenSymbol d_reduced in
+    if i == 0 then u else
+    case d' of
+      []      -> (DegenSymbol (if i == 1 then [] else [i]), FaceSymbol f')
+      (k:d'') -> case f' of
+        (l:_) | l > 0 -> (DegenSymbol (i:k:d''), FaceSymbol f')
+        _ -> (DegenSymbol (k+i:d''), FaceSymbol f')
+
+data FormalDegen a  -- writer monad
+  = FormalDegen {
+    underlyingGeom :: a,  -- Dimension n
+    degenSymbol :: DegenSymbol -- [m] -> [n]
+  }
   deriving (Eq, Functor)
   deriving (Constrained.Functor (->) (->)) via (Constrained.Wrapped FormalDegen)
 
 instance Show a => Show (FormalDegen a) where
-  show (NonDegen a) = show a
-  show (Degen i a) = "s_" ++ show i ++ " " ++ show a
+  show b@(FormalDegen a d) =
+    if isDegen b then
+      show a
+    else
+      "s_" ++ show d ++ " " ++ show a
 
 instance Applicative FormalDegen where
-  pure = NonDegen
+  pure a = FormalDegen a mempty
   (<*>) = ap
 
 instance Monad FormalDegen where
-  (NonDegen s) >>= f = f s
-  (Degen i s) >>= f = degen (s >>= f) i
+  (FormalDegen a d) >>= f =
+    let FormalDegen b d' = f a in
+      FormalDegen b (d <> d')
 
+-- These functions don't depend on a at all.
+-- TODO separate
 isDegen :: FormalDegen a -> Bool
-isDegen (NonDegen _) = False
-isDegen (Degen _ _) = True
-
-underlyingGeom :: FormalDegen a -> a
-underlyingGeom (NonDegen s) = s
-underlyingGeom (Degen _ s) = underlyingGeom s
+isDegen (FormalDegen _ (DegenSymbol [])) = True
+isDegen _ = False
 
 degen :: FormalDegen a -> Int -> FormalDegen a
-degen (Degen j s) i | i <= j = Degen (j + 1) (degen s i)
-degen s i = Degen i s
+degen (FormalDegen a d) i = FormalDegen a (primDegen i <> d)
+
+nonDegen :: a -> FormalDegen a
+nonDegen a = FormalDegen a mempty
 
 degenList :: FormalDegen a -> [Int]
-degenList (NonDegen _) = []
-degenList (Degen i s) = i : degenList s
+degenList = helper 0 . dsymbol . degenSymbol
+  where
+    helper :: Int -> [Int] -> [Int]
+    helper _ [] = []
+    helper n (x:xs) = [n..n+x-1] ++ helper (n+x) xs
 
-degenCount :: FormalDegen a -> Int
-degenCount (NonDegen _) = 0
-degenCount (Degen i s) = 1 + degenCount s
+degenCount :: DegenSymbol -> Int
+degenCount (DegenSymbol d) = sum d - length d
 
 -- In this representation, we just need to check that the index is
 -- somewhere in the list. (Not necessarily the first thing)
 isImageOfDegen :: FormalDegen a -> Int -> Bool
-isImageOfDegen (NonDegen _) _ = False
-isImageOfDegen (Degen j s) i
-  | i == j = True
-  | i > j = False -- We missed it, it can't be further down.
-  | otherwise = isImageOfDegen s i
+isImageOfDegen (FormalDegen a (DegenSymbol d)) = helper d
+  where
+    helper :: [Int] -> Int -> Bool
+    helper [] _ = False
+    helper (x:xs) n | n  <  x-1 = True
+                    | n  == x-1 = False
+                    | otherwise = helper xs (n-x)
 
 constantAt :: a -> Int -> FormalDegen a
-constantAt a 0 = NonDegen a
-constantAt a n = Degen (n - 1) $ constantAt a (n -1)
+constantAt a n =
+  if n == 0 then
+    FormalDegen a (DegenSymbol [])
+  else
+    FormalDegen a (DegenSymbol [n])
+
+-- `allDegens m n` lists all the degeneracy symbols [m] -> [n]
+allDegens :: Int -> Int -> [DegenSymbol]
+allDegens m n
+  | m <  n = []
+  | m == n = [mempty] -- shortcut
+  | otherwise = do
+  k <- [1..m+1]
+  DegenSymbol d <- allDegens (m-k) (n-1)
+  return $ DegenSymbol (k:d)
+
 
 -- The following are dangerous and only make sense in certain situations.
-downshiftN :: Int -> FormalDegen a -> FormalDegen a
-downshiftN n (NonDegen s) = NonDegen s
-downshiftN n (Degen i s) = Degen (i + n) (downshiftN n s)
+downshiftN :: Int -> FormalDegen a -> FormalDegen a  -- seems to assume n >= 0
+downshiftN n (FormalDegen a (DegenSymbol d)) = FormalDegen a (DegenSymbol $ helper n d)
+  where
+    helper :: Int -> [Int] -> [Int]
+    helper 0 xs = xs
+    helper n [] = []
+    helper n xs =
+      if last xs == 2 then
+        init xs ++ replicate n 1 ++ [2]
+      else
+        init xs ++ [last xs - 1] ++ replicate (n-1) 1 ++ [2]
 
 downshift :: FormalDegen a -> FormalDegen a
 downshift = downshiftN 1
 
+-- Composition with a face map, represented as a decreasing sequence of
+-- generating face maps
 unDegen :: FormalDegen a -> [Int] -> FormalDegen a
-unDegen s [] = s
-unDegen (NonDegen _) js = undefined -- shouldn't happen
-unDegen (Degen i s) (j : js)
-  | i == j = unDegen s js
-  | otherwise = Degen (i - length (j : js)) (unDegen s (j : js))
+unDegen (FormalDegen a d) f = FormalDegen a (DegenSymbol (helper (differ f) d))
+  where
+    helper f d =
+      let (d', f') = f # d in
+      if f' /= FaceSymbol [] then
+        error "IMPOSSIBLE: unDegen"
+      else
+        dsymbol d'
+
+    differ f = let f' = reverse f in
+      FaceSymbol $ zipWith (\ a b -> a - b - 1) f' (0:f')
 
 type Simplex a = FormalDegen (GeomSimplex a)
 
@@ -100,41 +187,42 @@ class Eq (GeomSimplex a) => SSet a where
 
   geomSimplexDim :: a -> GeomSimplex a -> Int
 
-  -- geomSimplexDim a s = length (geomFaces a s)
   geomFace :: a -> GeomSimplex a -> Int -> Simplex a
 
+  -- geomSimplexDim a s = length (geomFaces a s)
   geomFaces :: a -> GeomSimplex a -> [Simplex a]
   geomFaces a s =
     let d = geomSimplexDim a s
      in if d == 0 then [] else fmap (geomFace a s) [0 .. d]
 
--- TODO: for efficiency?
--- nonDegenFaces :: a -> GeomSimplex a -> [(Int, Simplex a)]
-
-isSimplex' :: SSet a => a -> Simplex a -> Maybe Int
-isSimplex' a (NonDegen s) = if isGeomSimplex a s then Just (geomSimplexDim a s) else Nothing
-isSimplex' a (Degen i s) = do
-  nextdim <- isSimplex' a s
-  if i <= nextdim
-    then Just (nextdim + 1)
-    else Nothing
+  -- TODO: for efficiency?
+  -- nonDegenFaces :: a -> GeomSimplex a -> [(Int, Simplex a)]
 
 isSimplex :: SSet a => a -> Simplex a -> Bool
-isSimplex a s = isJust (isSimplex' a s)
+isSimplex a (FormalDegen g d)
+  = isGeomSimplex a g && length (dsymbol d) <= geomSimplexDim a g + 1
 
 simplexDim :: SSet a => a -> Simplex a -> Int
-simplexDim a (NonDegen s) = geomSimplexDim a s
-simplexDim a (Degen i s) = 1 + simplexDim a s
+simplexDim a (FormalDegen g d) = geomSimplexDim a g + degenCount d
+
+-- Apply a face operator
+geomFace' :: SSet a => FaceSymbol -> a -> GeomSimplex a -> Simplex a
+geomFace' (FaceSymbol []) _ g = nonDegen g
+geomFace' (FaceSymbol [x]) a g = geomFace a g x
+geomFace' (FaceSymbol (x:xs@(y:ys))) a g =
+  face' (FaceSymbol (x+y:ys)) a $ geomFace a g x
+
+face' :: SSet a => FaceSymbol -> a -> Simplex a -> Simplex a
+face' f a (FormalDegen g d) =
+  let (d', f') = f # d in
+  let FormalDegen g' d'' = geomFace' f' a g in
+    FormalDegen g' (d' <> d'')
 
 face :: SSet a => a -> Simplex a -> Int -> Simplex a
-face a (NonDegen s) i = geomFace a s i
-face a (Degen j s) i
-  | i < j = degen (face a s i) (j - 1)
-  | i > j + 1 = degen (face a s (i - 1)) j
-  | otherwise = s
+face a s i = face' (primFace i) a s
 
 hasFace :: SSet a => a -> GeomSimplex a -> GeomSimplex a -> Bool
-hasFace a t s = NonDegen s `elem` geomFaces a t
+hasFace a t s = nonDegen s `elem` geomFaces a t
 
 frontFace :: SSet a => a -> Simplex a -> Simplex a
 frontFace a s = face a s 0
@@ -148,10 +236,7 @@ class SSet a => FiniteType a where
 
 someSimplices :: (SSet a) => a -> Int -> (Int -> [GeomSimplex a]) -> [Simplex a]
 someSimplices a n f | n < 0 = []
-someSimplices a n f = fmap NonDegen (f n) ++ (degensOf =<< someSimplices a (n - 1) f)
-  where
-    degensOf s@(NonDegen g) = fmap (\i -> Degen i s) [0 .. simplexDim a s]
-    degensOf s@(Degen j _)  = fmap (\i -> Degen i s) [(j + 1) .. simplexDim a s]
+someSimplices a n f = [FormalDegen g d | k <- [0 .. n], g <- f n, d <- allDegens n k]
 
 allSimplices :: (FiniteType a) => a -> Int -> [Simplex a]
 allSimplices a n = someSimplices a n (geomBasis a)
@@ -163,7 +248,7 @@ class SSet a => Pointed a where
   basepoint :: a -> GeomSimplex a
 
 basepointSimplex :: (Pointed a) => a -> Simplex a
-basepointSimplex a = NonDegen (basepoint a)
+basepointSimplex a = nonDegen (basepoint a)
 
 -- TODO: move Pointed to its own file to import Morphism
 -- basepointMor :: a -> Morphism () a
@@ -180,14 +265,15 @@ newtype UMorphism a b = Morphism {onGeomSimplex :: a -> FormalDegen b}
 type Morphism a b = UMorphism (GeomSimplex a) (GeomSimplex b)
 
 onSimplex :: UMorphism a b -> FormalDegen a -> FormalDegen b
-onSimplex (Morphism f) (NonDegen s) = f s
-onSimplex m (Degen i s) = degen (onSimplex m s) i
+onSimplex (Morphism f) (FormalDegen a d) =
+  let FormalDegen b d' = f a in
+    FormalDegen b (d <> d')
 
 instance Constrained.Semigroupoid UMorphism where
   f2 . (Morphism f1) = Morphism $ \s -> f2 `onSimplex` f1 s
 
 instance Constrained.Category UMorphism where
-  id = Morphism $ \s -> NonDegen s
+  id = Morphism $ \s -> nonDegen s
 
 instance Constrained.Functor UMorphism (->) FormalDegen where
   fmap = onSimplex

@@ -4,6 +4,7 @@ module Math.Algebra.SmithNormalForm
   )
 where
 
+import Control.Monad
 import Control.Monad.State
 import Data.List (foldl')
 import Data.Monoid (All (..))

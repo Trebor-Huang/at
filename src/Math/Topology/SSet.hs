@@ -18,11 +18,14 @@ instance Show DegenSymbol where
 primDegen :: Int -> DegenSymbol
 primDegen n = DegenSymbol $ replicate n 1 ++ [2] -- TODO more efficient
 
+pattern NonDegen :: DegenSymbol
+pattern NonDegen = DegenSymbol []
+
 -- They form a ValueCategory, but let's make less fuss
 instance Semigroup DegenSymbol where
   -- p : [m] -> [n], q : [n] -> [k]
-  DegenSymbol [] <> q = q
-  p <> DegenSymbol [] = p
+  NonDegen <> q = q
+  p <> NonDegen = p
   p <> DegenSymbol (x:xs) =
     let (p1, p2) = splitAt x (dsymbol p) in
       -- It can also handle DegenSymbol with zero entries
@@ -52,7 +55,7 @@ headShift k (FaceSymbol (x:xs)) = FaceSymbol (x+k:xs)
 
 -- | Adds an element to the head of a degeneracy map
 (?:) :: Int -> DegenSymbol -> DegenSymbol
-1 ?: (DegenSymbol []) = DegenSymbol []
+1 ?: NonDegen = NonDegen
 x ?: (DegenSymbol d) = DegenSymbol (x:d)
 infixr 5 ?:
 
@@ -60,7 +63,7 @@ infix 4 #
 -- exchanges --f-> --d-> to --d'-> --f'->
 (#) :: FaceSymbol -> DegenSymbol -> (DegenSymbol, FaceSymbol)
 FaceSymbol [] # d = (d, FaceSymbol [])
-f # DegenSymbol [] = (DegenSymbol [], f)
+f # NonDegen = (NonDegen, f)
 FaceSymbol (i:f) # DegenSymbol (j:d)
   | j <= i =  -- The degeneracy has not reached the first omitted vertex
     let (d', f') = FaceSymbol (i-j:f) # DegenSymbol d in
@@ -86,13 +89,13 @@ data FormalDegen a  -- writer monad
 
 instance Show a => Show (FormalDegen a) where
   show b@(FormalDegen a d) =
-    if isDegen b then
+    if not (isDegen b) then
       show a
     else
       "s_" ++ show d ++ " " ++ show a
 
 instance Applicative FormalDegen where
-  pure a = FormalDegen a mempty
+  pure a = FormalDegen a NonDegen
   (<*>) = ap
 
 instance Monad FormalDegen where
@@ -103,8 +106,8 @@ instance Monad FormalDegen where
 -- These functions don't depend on a at all.
 -- TODO separate, and eliminate outside references to the internals
 isDegen :: FormalDegen a -> Bool
-isDegen (FormalDegen _ (DegenSymbol [])) = True
-isDegen _ = False
+isDegen (FormalDegen _ NonDegen) = False
+isDegen _ = True
 
 -- | Applies a formal degeneracy symbol to an already degenerate simplex.
 degen' :: DegenSymbol -> FormalDegen a -> FormalDegen a
@@ -114,7 +117,7 @@ degen :: FormalDegen a -> Int -> FormalDegen a
 degen s i = degen' (primDegen i) s
 
 nonDegen :: a -> FormalDegen a
-nonDegen a = FormalDegen a mempty
+nonDegen a = FormalDegen a NonDegen
 
 degenList :: FormalDegen a -> [Int]
 degenList = helper 0 . dsymbol . degenSymbol
@@ -138,13 +141,13 @@ isImageOfDegen (FormalDegen a (DegenSymbol d)) = helper d
 
 -- | Constant simplex at specified dimension
 constantAt :: a -> Int -> FormalDegen a
-constantAt a n = FormalDegen a (n ?: mempty)
+constantAt a n = FormalDegen a (n ?: NonDegen)
 
 -- | If the zeroth vertex is not degenerate, removes it.
 -- Otherwise returns `Nothing`.
 -- Used in simplicial principal bundles.
 knockOff :: DegenSymbol -> Maybe DegenSymbol
-knockOff (DegenSymbol []) = Just (DegenSymbol [])
+knockOff NonDegen = Just NonDegen
 knockOff (DegenSymbol (1:xs)) = Just (DegenSymbol xs)
 knockOff _ = Nothing
 
@@ -152,7 +155,7 @@ knockOff _ = Nothing
 allDegens :: Int -> Int -> [DegenSymbol]
 allDegens m n
   | m <  n = []
-  | m == n = [mempty] -- shortcut
+  | m == n = [NonDegen] -- shortcut
   | otherwise = do
   k <- [1..m+1]
   DegenSymbol d <- allDegens (m-k) (n-1)
@@ -161,7 +164,7 @@ allDegens m n
 
 -- The following are dangerous and only make sense in certain situations.
 downshiftN :: Int -> FormalDegen a -> FormalDegen a  -- seems to assume n >= 0
-downshiftN n (FormalDegen a (DegenSymbol [])) = FormalDegen a mempty
+downshiftN n (FormalDegen a NonDegen) = nonDegen a
 downshiftN n (FormalDegen a (DegenSymbol d)) =
   FormalDegen a (DegenSymbol (replicate n 1 ++ d))
 
@@ -169,9 +172,9 @@ downshift :: FormalDegen a -> FormalDegen a
 downshift = downshiftN 1
 
 upshift :: FormalDegen a -> FormalDegen a
-upshift (FormalDegen a (DegenSymbol (1:d))) = (FormalDegen a (DegenSymbol d))
-upshift (FormalDegen a (DegenSymbol (n:d))) = (FormalDegen a (n-1 ?: DegenSymbol d))
-upshift (FormalDegen a (DegenSymbol [])) = (FormalDegen a (DegenSymbol []))
+upshift (FormalDegen a (DegenSymbol (1:d))) = FormalDegen a (DegenSymbol d)
+upshift (FormalDegen a (DegenSymbol (n:d))) = FormalDegen a (n-1 ?: DegenSymbol d)
+upshift (FormalDegen a NonDegen) = FormalDegen a NonDegen
 
 -- Composition with a face map, represented as a decreasing sequence of
 -- generating face maps

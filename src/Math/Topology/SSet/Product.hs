@@ -30,28 +30,6 @@ data Product a b = Product a b
 instance (Show a, Show b) => Show (Product a b) where
   show (Product a b) = show a ++ " × " ++ show b
 
--- NOTE: In bit-field form we can use "Parallel Bits Extract" or
--- similar to do this efficiently. Single x86 instruction!
--- https://stackoverflow.com/questions/21144237/standard-c11-code-equivalent-to-the-pext-haswell-instruction-and-likely-to-be
-prodNormalise :: (Simplex a, Simplex b) -> Simplex (Product a b)
-prodNormalise (Degen i s, Degen j t)
-  | i == j = degen (prodNormalise (s, t)) i
-  | i > j =
-    let p = prodNormalise (s, Degen j t)
-     in fmap (\(s', t') -> (Degen (i - degenCount p) s', t')) p
-  | i < j =
-    let p = prodNormalise (Degen i s, t)
-     in fmap (\(s', t') -> (s', Degen (j - degenCount p) t')) p
-prodNormalise s = NonDegen s
-
-prodUnnormalise :: Simplex (Product a b) -> (Simplex a, Simplex b)
-prodUnnormalise s = (s >>= fst, s >>= snd) -- nice!
-
-jointlyNonDegen :: (Simplex a, Simplex b) -> Bool
-jointlyNonDegen ss = case prodNormalise ss of
-  NonDegen _ -> True
-  Degen _ _ -> False
-
 instance (SSet a, SSet b) => SSet (Product a b) where
   type GeomSimplex (Product a b) = (Simplex a, Simplex b)
   isGeomSimplex (Product a b) (s, t) =
@@ -64,8 +42,44 @@ instance (SSet a, SSet b) => SSet (Product a b) where
 
   geomFace (Product a b) (s, t) i = prodNormalise (face a s i, face b t i)
 
+-- NOTE: In bit-field form we can use "Parallel Bits Extract" or
+-- similar to do this efficiently. Single x86 instruction!
+-- https://stackoverflow.com/questions/21144237/standard-c11-code-equivalent-to-the-pext-haswell-instruction-and-likely-to-be
+
+-- | Join two degeneracies p : [n] -> [i] and q : [n] -> [j].
+-- More precisely, it now pinches together points that are pinched
+-- together by both maps simultaneously.
+-- It returns (j : [n] -> [?], p', q') satisfying
+-- -
+-- - j <> p' = p
+-- - j <> q' = q
+joinDegen :: DegenSymbol -> DegenSymbol -> (DegenSymbol, DegenSymbol, DegenSymbol)
+joinDegen (DegenSymbol (x:xs)) (DegenSymbol (y:ys))
+  | x > y =
+    let (j, p', q') = ((x-y) ?: DegenSymbol xs) `joinDegen` DegenSymbol ys in
+      (y ?: j, (1 ?: p') <> DegenSymbol [2], 1 ?: q')
+  | x < y =
+    let (j, p', q') = DegenSymbol xs `joinDegen` ((y-x) ?: DegenSymbol ys) in
+      (x ?: j, 1 ?: p', (1 ?: q') <> DegenSymbol [2])
+  | otherwise =
+    let (j, p', q') = DegenSymbol xs `joinDegen` DegenSymbol ys in
+      (x ?: j, 1 ?: p', 1 ?: q')
+joinDegen p NonDegen = (NonDegen, p, NonDegen)
+joinDegen NonDegen q = (NonDegen, NonDegen, q)
+
+prodNormalise :: (Simplex a, Simplex b) -> Simplex (Product a b)
+prodNormalise (FormalDegen a d1, FormalDegen b d2) =
+  let (d, p, q) = joinDegen d1 d2 in
+    FormalDegen (FormalDegen a p, FormalDegen b q) d
+
+prodUnnormalise :: Simplex (Product a b) -> (Simplex a, Simplex b)
+prodUnnormalise s = (s >>= fst, s >>= snd) -- nice!
+
+jointlyNonDegen :: (Simplex a, Simplex b) -> Bool
+jointlyNonDegen ss = not $ isDegen (prodNormalise ss)
+
 instance (Pointed a, Pointed b) => Pointed (Product a b) where
-  basepoint (Product a b) = (NonDegen $ basepoint a, NonDegen $ basepoint b)
+  basepoint (Product a b) = (nonDegen $ basepoint a, nonDegen $ basepoint b)
 
 instance (ZeroReduced a, ZeroReduced b) => ZeroReduced (Product a b)
 
@@ -75,7 +89,7 @@ instance (FiniteType a, FiniteType b) => FiniteType (Product a b) where
   geomBasis (Product a b) n = [(s, t) | s <- allSimplices a n, t <- allSimplices b n, isGeomSimplex (Product a b) (s, t)]
 
 prodSym :: Morphism (Product a b) (Product b a)
-prodSym = Morphism $ \(s, t) -> NonDegen (t, s)
+prodSym = Morphism $ \(s, t) -> nonDegen (t, s)
 
 prodAssoc :: Morphism (Product (Product a b) c) (Product a (Product b c))
 prodAssoc = Morphism $ \(st, r) ->
@@ -100,50 +114,61 @@ instance (SSet a, SSet b) => DVF (Product a b) where
 
 -- TODO: in bit-field form this could be done by some efficient
 -- twiddling
-data Direction = X | Y | Diag | End
+-- data Direction = X | Y | Diag | End
 
 -- Walking backwards from (p,q) to (0,0)
-spathStep :: (Int, Simplex a, Simplex b) -> (Direction, (Int, Simplex a, Simplex b))
-spathStep (0, _, _) = (End, undefined)
-spathStep (q, Degen i s, t) | i + 1 == q = (X, (q - 1, s, t))
-spathStep (q, s, Degen j t) | j + 1 == q = (Y, (q - 1, s, t))
-spathStep (q, s, t) = (Diag, (q - 1, s, t))
+-- spathStep :: (Int, Simplex a, Simplex b) -> (Direction, (Int, Simplex a, Simplex b))
+-- spathStep = undefined
+-- spathStep (0, _, _) = (End, undefined)
+-- spathStep (q, Degen i s, t) | i + 1 == q = (X, (q - 1, s, t))
+-- spathStep (q, s, Degen j t) | j + 1 == q = (Y, (q - 1, s, t))
+-- spathStep (q, s, t) = (Diag, (q - 1, s, t))
 
-spathUnstep :: Direction -> (Int, Simplex a, Simplex b) -> (Int, Simplex a, Simplex b)
-spathUnstep Diag (q, s, t) = (q + 1, s, t)
-spathUnstep X (q, s, t) = (q + 1, Degen q s, t)
-spathUnstep Y (q, s, t) = (q + 1, s, Degen q t)
-spathUnstep End (q, s, t) = undefined
+-- spathUnstep :: Direction -> (Int, Simplex a, Simplex b) -> (Int, Simplex a, Simplex b)
+-- spathUnstep = undefined
+-- spathUnstep Diag (q, s, t) = (q + 1, s, t)
+-- spathUnstep X (q, s, t) = (q + 1, Degen q s, t)
+-- spathUnstep Y (q, s, t) = (q + 1, s, Degen q t)
+-- spathUnstep End (q, s, t) = undefined
 
-incidenceFor :: Int -> Incidence
-incidenceFor x = if even x then Pos else Neg
+incidenceFor :: Int -> Incidence  -- which face
+incidenceFor ix = if even ix then Pos else Neg
+
+eventSearch :: DegenSymbol -> DegenSymbol -> Int -> Status DegenSymbol
+eventSearch (DegenSymbol (x:xs)) (DegenSymbol (y:ys)) i
+  | x == y = undefined
+  | x == y+1 = undefined
+eventSearch _ _ _ = Critical
 
 -- Little worried about signs in here, likely off by 1
-statusStep :: (SSet a, SSet b) => Product a b -> (Int, Simplex a, Simplex b) -> Status (Int, Simplex a, Simplex b)
-statusStep prd qst = case spathStep qst of
-  -- Simplex is a target
-  (Y, qst')
-    | (X, (q'', s'', t'')) <- spathStep qst' ->
-      Target (spathUnstep Diag (q'', s'', t'')) (incidenceFor (q'' + 1))
-  -- Simplex is a source
-  (Diag, (q', s', t')) ->
-    Source
-      (spathUnstep Y $ spathUnstep X (q', s', t'))
-      (incidenceFor (q' + 1))
-  -- Simplex is critical
-  (End, _) -> Critical
-  -- Keep searching
-  (d, qst') -> fmap (spathUnstep d) (statusStep prd qst')
+-- statusStep :: (SSet a, SSet b) => Product a b -> (Int, Simplex a, Simplex b) -> Status (Int, Simplex a, Simplex b)
+-- statusStep prd qst = case spathStep qst of
+--   -- Simplex is a target
+--   (Y, qst')
+--     | (X, (q'', s'', t'')) <- spathStep qst' ->
+--       Target (spathUnstep Diag (q'', s'', t'')) (incidenceFor (q'' + 1))
+--   -- Simplex is a source
+--   (Diag, (q', s', t')) ->
+--     Source
+--       (spathUnstep Y $ spathUnstep X (q', s', t'))
+--       (incidenceFor (q' + 1))
+--   -- Simplex is critical
+--   (End, _) -> Critical
+--   -- Keep searching
+--   (d, qst') -> fmap (spathUnstep d) (statusStep prd qst')
 
 status :: (SSet a, SSet b) => Product a b -> (Simplex a, Simplex b) -> Status (Simplex a, Simplex b)
-status (Product a b) (s, t) =
-  fmap (\(_, s, t) -> (s, t)) $
-    statusStep
-      (Product a b)
-      ( simplexDim a s,
-        s,
-        t
-      )
+-- status (Product a b) (s, t) =
+--   fmap (\(_, s, t) -> (s, t)) $
+--     statusStep
+--       (Product a b)
+--       ( simplexDim a s,
+--         s,
+--         t
+--       )
+status (Product a b) (s, t) = fmap (\ d -> undefined) $
+  eventSearch (degenSymbol s) (degenSymbol t) 0
+
 
 stripProduct :: (Simplex a, Simplex b) -> (GeomSimplex a, GeomSimplex b)
 stripProduct (s, t) = (underlyingGeom s, underlyingGeom t)
@@ -181,7 +206,7 @@ ezReduction p@(Product a b) =
     . dvfReduction (NChains p)
 
 diagMor :: Morphism a (Product a a)
-diagMor = Morphism $ \s -> NonDegen (NonDegen s, NonDegen s)
+diagMor = Morphism $ \s -> nonDegen (nonDegen s, nonDegen s)
 
 instance (SSet a, Eq (GeomSimplex a)) => Coalgebra (NChains a) where
   counitMor a = CC.Morphism 0 $ \s -> if degree a s == 0 then singleComb () else 0

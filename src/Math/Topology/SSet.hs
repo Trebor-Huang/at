@@ -67,6 +67,9 @@ FaceSymbol (i:f) # DegenSymbol (j:d)
       (j ?: d', headShift 1 f')
   | j == i+1 =  -- Edge case
     let (d', f') = FaceSymbol f # DegenSymbol d in
+    if i == 0 then
+      (d', FaceSymbol (0 : fsymbol f'))
+    else
       (i ?: d', headShift 1 f')
   | otherwise =  -- The first omitted vertex is within the first degeneracy
     let (d', f') = FaceSymbol f # (j-i-1) ?: DegenSymbol d in
@@ -158,6 +161,7 @@ allDegens m n
 
 -- The following are dangerous and only make sense in certain situations.
 downshiftN :: Int -> FormalDegen a -> FormalDegen a  -- seems to assume n >= 0
+downshiftN n (FormalDegen a (DegenSymbol [])) = FormalDegen a mempty
 downshiftN n (FormalDegen a (DegenSymbol d)) =
   FormalDegen a (DegenSymbol (replicate n 1 ++ d))
 

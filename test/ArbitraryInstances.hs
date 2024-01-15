@@ -5,6 +5,7 @@ module ArbitraryInstances where
 
 import Data.List (sort)
 import Data.Matrix
+import Math.Topology.SSet
 import Math.Algebra.AbGroupPres
 import Math.Algebra.AbGroupPres.IsoClass
 import Math.ValueCategory
@@ -50,6 +51,24 @@ allMinors m = do
   r <- [0 .. (nrows m) - 1]
   c <- [0 .. (ncols m) - 1]
   return $ minorMatrix r c m
+
+instance Arbitrary DegenSymbol where
+  arbitrary = DegenSymbol <$> helper
+    where
+      helper = sized $ \n ->
+        frequency [
+          (1, (:[]) <$> chooseInt (2, 5)),
+          (n, (:) <$> chooseInt (1, 4) <*> helper)
+        ]
+
+instance Arbitrary FaceSymbol where
+  arbitrary = FaceSymbol <$> helper
+    where
+      helper = sized $ \n ->
+        frequency [
+          (1, return []),
+          (n, (:) <$> chooseInt (0, 5) <*> helper)
+        ]
 
 instance Arbitrary IsoClass where
   arbitrary = sized $ \i -> do

@@ -25,7 +25,8 @@ instance Semigroup DegenSymbol where
   p <> DegenSymbol [] = p
   p <> DegenSymbol (x:xs) =
     let (p1, p2) = splitAt x (dsymbol p) in
-      DegenSymbol (sum p1: p2 <> xs)
+      -- It can also handle DegenSymbol with zero entries
+      headCons (sum p1 + x - length p1) (DegenSymbol p2 <> DegenSymbol xs)
 
 instance Monoid DegenSymbol where
   mempty = DegenSymbol []
@@ -44,25 +45,31 @@ instance Show FaceSymbol where
 primFace :: Int -> FaceSymbol
 primFace n = FaceSymbol [n]
 
+-- appends k elements at the beginning of a face map untouched.
+headShift :: Int -> FaceSymbol -> FaceSymbol
+headShift k (FaceSymbol []) = FaceSymbol []
+headShift k (FaceSymbol (x:xs)) = FaceSymbol (x+k:xs)
+
+-- adds an element to the head of a degeneracy map
+headCons :: Int -> DegenSymbol -> DegenSymbol
+headCons 1 (DegenSymbol []) = DegenSymbol []
+headCons x (DegenSymbol d) = DegenSymbol (x:d)
+
 -- exchanges --f-> --d-> to --d'-> --f'->
 (#) :: FaceSymbol -> DegenSymbol -> (DegenSymbol, FaceSymbol)
 FaceSymbol [] # d = (d, FaceSymbol [])
 f # DegenSymbol [] = (DegenSymbol [], f)
 FaceSymbol (i:f) # DegenSymbol (j:d)
-  | i >= j =
-    let (DegenSymbol d', FaceSymbol f') = FaceSymbol (i-j:f) # DegenSymbol d in
-    case f' of
-      []      -> (DegenSymbol (j:d'), FaceSymbol [])
-      (k:f'') -> (DegenSymbol (j:d'), FaceSymbol (k+1:f''))
-  | otherwise =
-    let d_reduced = if i == j+1 then d else (j-i-1:d) in
-    let u@(DegenSymbol d', FaceSymbol f') = FaceSymbol f # DegenSymbol d_reduced in
-    if i == 0 then u else
-    case d' of
-      []      -> (DegenSymbol (if i == 1 then [] else [i]), FaceSymbol f')
-      (k:d'') -> case f' of
-        (l:_) | l > 0 -> (DegenSymbol (i:k:d''), FaceSymbol f')
-        _ -> (DegenSymbol (k+i:d''), FaceSymbol f')
+  | j <= i =  -- The degeneracy has not reached the first omitted vertex
+    let (d', f') = FaceSymbol (i-j:f) # DegenSymbol d in
+      (headCons j d', headShift 1 f')
+  | j == i+1 =  -- Edge case
+    let (d', f') = FaceSymbol f # DegenSymbol d in
+      (headCons i d', headShift 1 f')
+  | otherwise =  -- The first omitted vertex is within the first degeneracy
+    let (d', f') = FaceSymbol f # headCons (j-i-1) (DegenSymbol d) in
+    let (d'', f'') = headShift 1 f' # DegenSymbol [2] in
+      (headCons i d' <> d'', f'')
 
 data FormalDegen a  -- writer monad
   = FormalDegen {
@@ -122,11 +129,7 @@ isImageOfDegen (FormalDegen a (DegenSymbol d)) = helper d
                     | otherwise = helper xs (n-x)
 
 constantAt :: a -> Int -> FormalDegen a
-constantAt a n =
-  if n == 0 then
-    FormalDegen a (DegenSymbol [])
-  else
-    FormalDegen a (DegenSymbol [n])
+constantAt a n = FormalDegen a (headCons n mempty)
 
 -- `allDegens m n` lists all the degeneracy symbols [m] -> [n]
 allDegens :: Int -> Int -> [DegenSymbol]
@@ -157,18 +160,20 @@ downshift = downshiftN 1
 
 -- Composition with a face map, represented as a decreasing sequence of
 -- generating face maps
-unDegen :: FormalDegen a -> [Int] -> FormalDegen a
-unDegen (FormalDegen a d) f = FormalDegen a (DegenSymbol (helper (differ f) d))
-  where
-    helper f d =
-      let (d', f') = f # d in
-      if f' /= FaceSymbol [] then
-        error "IMPOSSIBLE: unDegen"
-      else
-        dsymbol d'
+-- Is this even used at all
 
-    differ f = let f' = reverse f in
-      FaceSymbol $ zipWith (\ a b -> a - b - 1) f' (0:f')
+-- unDegen :: FormalDegen a -> [Int] -> FormalDegen a
+-- unDegen (FormalDegen a d) f = FormalDegen a (DegenSymbol (helper (differ f) d))
+--   where
+--     helper f d =
+--       let (d', f') = f # d in
+--       if f' /= FaceSymbol [] then
+--         error "IMPOSSIBLE: unDegen"
+--       else
+--         dsymbol d'
+
+--     differ f = let f' = reverse f in
+--       FaceSymbol $ zipWith (\ a b -> a - b - 1) f' (0:f')
 
 type Simplex a = FormalDegen (GeomSimplex a)
 

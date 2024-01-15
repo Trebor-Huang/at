@@ -77,10 +77,10 @@ normalise g (s : ss) = downshift $ fmap (\(s, t) -> WbarSimplex (s : unnormalise
   where
     p = prodNormalise (s, normalise g ss)
 
-insertUnit :: (Pointed g) => g -> Int -> [Simplex g] -> [Simplex g]
-insertUnit g 0 ss = constantAt (basepoint g) (length ss) : ss
-insertUnit g i (s : ss) = degen s (i - 1) : insertUnit g (i - 1) ss
-insertUnit g i _ = error "insertUnit: impossible"
+-- insertUnit :: (Pointed g) => g -> Int -> [Simplex g] -> [Simplex g]
+-- insertUnit g 0 ss = constantAt (basepoint g) (length ss) : ss
+-- insertUnit g i (s : ss) = degen s (i - 1) : insertUnit g (i - 1) ss
+-- insertUnit g i _ = error "insertUnit: impossible"
 
 unnormalise :: (Pointed g) => g -> Simplex (Wbar g) -> [Simplex g]
 unnormalise g (FormalDegen (WbarSimplex s) d)
@@ -95,6 +95,7 @@ unnormalise g (FormalDegen (WbarSimplex s) d)
         [maxdim,maxdim-1..mindim] ++
       degen' (DegenSymbol xs) s :
       helper g ss xs
+    helper g [] [x] = map (constantAt (basepoint g)) [x-2,x-3..0]
     helper _ _ _ = error "Wbar unnormalise: impossible"
 
 instance SGrp g => Pointed (Wbar g) where

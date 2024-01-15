@@ -26,7 +26,7 @@ instance SSet NSimplex where
   type GeomSimplex NSimplex = NSimplexSimplex
   geomSimplexDim (NSimplex d) (NSimplexSimplex vs) = length vs - 1
   isGeomSimplex (NSimplex d) (NSimplexSimplex vs) = length vs <= d + 1 && isOrdered vs
-  geomFace (NSimplex d) (NSimplexSimplex vs) i = NonDegen (NSimplexSimplex (deleteAt i vs))
+  geomFace (NSimplex d) (NSimplexSimplex vs) i = nonDegen (NSimplexSimplex (deleteAt i vs))
 
 -- TODO: could be more efficient
 choose :: Int -> [a] -> [[a]]

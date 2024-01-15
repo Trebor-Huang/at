@@ -35,27 +35,6 @@ newtype WbarSimplex a = WbarSimplex a
   deriving (Functor)
   deriving (Eq)
 
--- TODO: there are probably efficient algorithms for this in terms of bit fields.
--- 1. Create a bit field marking which positions are the unit
--- 2. Intersect this with the shifted degeneracy operators for each entry
--- 3. Delete all the surviving units and bit-extract every degeneracy operator appropriately
-
-normalise :: (Pointed g) => g -> [Simplex g] -> Simplex (Wbar g)
-normalise g [] = NonDegen $ WbarSimplex []
-normalise g (s : ss) | isUnit g s = degen (normalise g ss) 0
-normalise g (s : ss) = downshift $ fmap (\(s, t) -> WbarSimplex (s : unnormalise g t)) p
-  where
-    p = prodNormalise (s, normalise g ss)
-
-insertUnit :: (Pointed g) => g -> Int -> [Simplex g] -> [Simplex g]
-insertUnit g 0 ss = constantAt (basepoint g) (length ss) : ss
-insertUnit g i (s : ss) = degen s (i - 1) : insertUnit g (i - 1) ss
-insertUnit g i _ = error "insertUnit: impossible"
-
-unnormalise :: (Pointed g) => g -> Simplex (Wbar g) -> [Simplex g]
-unnormalise g (NonDegen (WbarSimplex gs)) = gs
-unnormalise g (Degen i s) = insertUnit g i (unnormalise g s)
-
 instance (SGrp g) => SSet (Wbar g) where
   -- A non-degenerate simplex is a list of simplices of `g`
   -- (Wbar G)_n = G_n-1 x G_n-2 x ... x G_0
@@ -65,7 +44,7 @@ instance (SGrp g) => SSet (Wbar g) where
 
   isGeomSimplex (Wbar g) (WbarSimplex ss) =
     all (\(i, s) -> simplexDim g s == i) (zip (reverse [0..length ss-1]) ss)
-    && normalise g ss == NonDegen (WbarSimplex ss)
+    && normalise g ss == nonDegen (WbarSimplex ss)
     && all (isSimplex g) ss
 
   geomSimplexDim _ (WbarSimplex ss) = length ss
@@ -86,6 +65,38 @@ instance (SGrp g) => SSet (Wbar g) where
           let (s : rest) = ss
            in (face g s (i - 1)) : underlying rest (i - 1)
 
+-- TODO: there are probably efficient algorithms for this in terms of bit fields.
+-- 1. Create a bit field marking which positions are the unit
+-- 2. Intersect this with the shifted degeneracy operators for each entry
+-- 3. Delete all the surviving units and bit-extract every degeneracy operator appropriately
+
+normalise :: (Pointed g) => g -> [Simplex g] -> Simplex (Wbar g)
+normalise g [] = nonDegen $ WbarSimplex []
+normalise g (s : ss) | isUnit g s = degen (normalise g ss) 0
+normalise g (s : ss) = downshift $ fmap (\(s, t) -> WbarSimplex (s : unnormalise g t)) p
+  where
+    p = prodNormalise (s, normalise g ss)
+
+insertUnit :: (Pointed g) => g -> Int -> [Simplex g] -> [Simplex g]
+insertUnit g 0 ss = constantAt (basepoint g) (length ss) : ss
+insertUnit g i (s : ss) = degen s (i - 1) : insertUnit g (i - 1) ss
+insertUnit g i _ = error "insertUnit: impossible"
+
+unnormalise :: (Pointed g) => g -> Simplex (Wbar g) -> [Simplex g]
+unnormalise g (FormalDegen (WbarSimplex s) d)
+  = helper g s (dsymbol d)
+  where
+    helper :: (Pointed g) => g -> [Simplex g] -> [Int] -> [Simplex g]
+    helper g ss [] = ss
+    helper g (s:ss) (x:xs) =
+      let mindim = length ss + sum xs - length xs + 1 in
+      let maxdim = mindim + x - 2 in
+      map (constantAt (basepoint g))
+        [maxdim,maxdim-1..mindim] ++
+      degen' (DegenSymbol xs) s :
+      helper g ss xs
+    helper _ _ _ = error "Wbar unnormalise: impossible"
+
 instance SGrp g => Pointed (Wbar g) where
   basepoint (Wbar g) = WbarSimplex []
 
@@ -105,7 +116,7 @@ instance (SAb g) => SGrp (Wbar g) where
       (onSimplex (prodMor g) . prodNormalise)
         <$> zip (unnormalise g gs1) (unnormalise g gs2)
 
-  invMor (Wbar g) = Morphism $ NonDegen . fmap (fmap (invMor g `onSimplex`))
+  invMor (Wbar g) = Morphism $ nonDegen . fmap (fmap (invMor g `onSimplex`))
 
 instance (SAb g) => SAb (Wbar g)
 
@@ -118,11 +129,6 @@ instance (SAb g) => SAb (Wbar g)
 
 -- Other simplicial groups will need the more complicated method
 -- described in serre.lisp and cl-space-efhm.lisp
-
-upshift :: FormalDegen a -> FormalDegen a
-upshift (NonDegen s) = NonDegen s
-upshift (Degen 0 s) = s
-upshift (Degen i s) = Degen (i - 1) (upshift s)
 
 instance (SAb g, ZeroReduced g) => DVF (Wbar g) where
   vf (Wbar g) (WbarSimplex []) = Critical

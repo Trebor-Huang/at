@@ -24,7 +24,7 @@ instance SSet Moore where
   geomFace (Moore p n) Basepoint _ = undefined
   geomFace (Moore p n) N _ = constantAt Basepoint (n - 1)
   geomFace (Moore p n) NPlusOne i
-    | even i && i < p * 2 = NonDegen N
+    | even i && i < p * 2 = nonDegen N
     | otherwise = constantAt Basepoint n
 
 instance FiniteType Moore where

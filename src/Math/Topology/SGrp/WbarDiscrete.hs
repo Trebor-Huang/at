@@ -13,18 +13,6 @@ import Math.Topology.SSet
 -- If a is a discrete group, things get much easier.
 newtype WbarDiscrete a = WbarDiscrete a
 
-normalise :: (Group a, Eq (Element a)) => a -> [Element a] -> Simplex (WbarDiscrete a)
-normalise a [] = NonDegen []
-normalise a (e : es)
-  | e == unit a = degen (normalise a es) 0
-  | otherwise = fmap (e :) (downshift (normalise a es))
-
-unnormalise :: (Group a, Eq (Element a)) => a -> Simplex (WbarDiscrete a) -> [Element a]
-unnormalise a (NonDegen g) = g
-unnormalise a (Degen i g) =
-  let (before, after) = splitAt i (unnormalise a g)
-   in before ++ [unit a] ++ after
-
 instance (Group a, Eq (Element a)) => SSet (WbarDiscrete a) where
   -- A non-degenerate n-simplex is a list of n non-identity elements
   -- of `a`
@@ -34,14 +22,29 @@ instance (Group a, Eq (Element a)) => SSet (WbarDiscrete a) where
 
   geomSimplexDim _ ss = length ss
 
-  geomFace _ [] _ = undefined
+  geomFace _ [] _ = error "WbarDiscrete geomFace: Trying to compute the face of a vertex"
   geomFace (WbarDiscrete a) ss i = normalise a (underlying ss i)
     where
-      underlying ss 0 = tail ss
+      underlying (_:ss) 0 = ss
       underlying [s] 1 = []
       underlying (s : s' : ss) 1 = prod a s s' : ss
       underlying (s : ss) i = s : underlying ss (i - 1)
       underlying _ _ = error "WbarDiscrete geomFace: impossible" -- can't happen
+
+normalise :: (Group a, Eq (Element a)) => a -> [Element a] -> Simplex (WbarDiscrete a)
+normalise a [] = nonDegen []
+normalise a (e : es)
+  | e == unit a = degen (normalise a es) 0
+  | otherwise = fmap (e :) (downshift (normalise a es))
+
+unnormalise :: (Group a, Eq (Element a)) => a -> Simplex (WbarDiscrete a) -> [Element a]
+unnormalise a (FormalDegen g d) = helper (unit a) g (dsymbol d)
+  where
+    helper :: el -> [el] -> [Int] -> [el]
+    helper u xs [] = xs
+    helper u [] [i] = replicate i u
+    helper u [] _ = error "WbarDiscrete unnormalise: impossible"
+    helper u (x:xs) (i:is) = replicate (i-1) u ++ x : helper u xs is
 
 instance (Group a, Eq (Element a)) => Pointed (WbarDiscrete a) where
   basepoint (WbarDiscrete a) = []
@@ -55,6 +58,6 @@ instance (FiniteGroup a, Eq (Element a)) => FiniteType (WbarDiscrete a) where
 
 instance (Abelian a, Eq (Element a)) => S.SGrp (WbarDiscrete a) where
   prodMor (WbarDiscrete a) = Morphism $ \(s, t) -> normalise a $ fmap (uncurry (prod a)) (zip (unnormalise a s) (unnormalise a t))
-  invMor (WbarDiscrete a) = Morphism $ \s -> NonDegen $ fmap (inv a) s
+  invMor (WbarDiscrete a) = Morphism $ \s -> nonDegen $ fmap (inv a) s
 
 instance (Abelian a, Eq (Element a)) => S.SAb (WbarDiscrete a)

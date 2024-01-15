@@ -47,10 +47,10 @@ type Action g f = Morphism (Product f g) f
 newtype Twist b g = Twist { twistOnGeom :: GeomSimplex b -> Simplex g }
 
 twistOnFor :: (SSet b, Pointed g) => b -> g -> Twist b g -> Simplex b -> Simplex g
-twistOnFor a g f (NonDegen s) = f `twistOnGeom` s
-twistOnFor a g f (Degen i s)
-  | i == 0 = constantAt (basepoint g) (simplexDim a s)
-  | otherwise = degen (twistOnFor a g f s) (i - 1)
+twistOnFor a g f s =
+  case knockOff (degenSymbol s) of
+    Nothing -> constantAt (basepoint g) (simplexDim a s - 1)
+    Just d0 -> degen' d0 (f `twistOnGeom` underlyingGeom s)
 
 pullback :: (SSet b, Pointed g) => b -> g -> Twist b g -> Morphism a b -> Twist a g
 pullback b g t f = Twist $ \a -> twistOnFor b g t (f `onGeomSimplex` a)

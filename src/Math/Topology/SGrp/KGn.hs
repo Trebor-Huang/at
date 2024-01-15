@@ -106,9 +106,9 @@ instance SSet KZmod2_1 where
   geomSimplexDim _ s = s
 
   geomFace _ 0 _ = undefined
-  geomFace _ s 0 = NonDegen (s - 1)
-  geomFace _ s i | s == i = NonDegen (s - 1)
-  geomFace _ s i = Degen (i - 1) (NonDegen (s - 2))
+  geomFace _ s 0 = nonDegen (s - 1)
+  geomFace _ s i | s == i = nonDegen (s - 1)
+  geomFace _ s i = FormalDegen (s-2) (primDegen (i-1))
 
 instance Pointed KZmod2_1 where
   basepoint _ = 0
@@ -137,7 +137,7 @@ complement n (i : is)
 instance SGrp KZmod2_1 where
   prodMor _ = Morphism $ \(s, t) ->
     let m = mergeSorted (degenList s) (degenList t)
-     in foldr (flip degen) (NonDegen $ length m) (complement (simplexDim KZmod2_1 s - 1) m)
-  invMor _ = Morphism NonDegen
+     in foldr (flip degen) (nonDegen $ length m) (complement (simplexDim KZmod2_1 s - 1) m)
+  invMor _ = Morphism nonDegen
 
 instance SAb KZmod2_1

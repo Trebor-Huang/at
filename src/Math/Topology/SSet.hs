@@ -26,7 +26,7 @@ instance Semigroup DegenSymbol where
   p <> DegenSymbol (x:xs) =
     let (p1, p2) = splitAt x (dsymbol p) in
       -- It can also handle DegenSymbol with zero entries
-      headCons (sum p1 + x - length p1) (DegenSymbol p2 <> DegenSymbol xs)
+      (sum p1 + x - length p1) ?: (DegenSymbol p2 <> DegenSymbol xs)
 
 instance Monoid DegenSymbol where
   mempty = DegenSymbol []
@@ -50,11 +50,13 @@ headShift :: Int -> FaceSymbol -> FaceSymbol
 headShift k (FaceSymbol []) = FaceSymbol []
 headShift k (FaceSymbol (x:xs)) = FaceSymbol (x+k:xs)
 
--- adds an element to the head of a degeneracy map
-headCons :: Int -> DegenSymbol -> DegenSymbol
-headCons 1 (DegenSymbol []) = DegenSymbol []
-headCons x (DegenSymbol d) = DegenSymbol (x:d)
+-- | Adds an element to the head of a degeneracy map
+(?:) :: Int -> DegenSymbol -> DegenSymbol
+1 ?: (DegenSymbol []) = DegenSymbol []
+x ?: (DegenSymbol d) = DegenSymbol (x:d)
+infixr 5 ?:
 
+infix 4 #
 -- exchanges --f-> --d-> to --d'-> --f'->
 (#) :: FaceSymbol -> DegenSymbol -> (DegenSymbol, FaceSymbol)
 FaceSymbol [] # d = (d, FaceSymbol [])
@@ -62,14 +64,14 @@ f # DegenSymbol [] = (DegenSymbol [], f)
 FaceSymbol (i:f) # DegenSymbol (j:d)
   | j <= i =  -- The degeneracy has not reached the first omitted vertex
     let (d', f') = FaceSymbol (i-j:f) # DegenSymbol d in
-      (headCons j d', headShift 1 f')
+      (j ?: d', headShift 1 f')
   | j == i+1 =  -- Edge case
     let (d', f') = FaceSymbol f # DegenSymbol d in
-      (headCons i d', headShift 1 f')
+      (i ?: d', headShift 1 f')
   | otherwise =  -- The first omitted vertex is within the first degeneracy
-    let (d', f') = FaceSymbol f # headCons (j-i-1) (DegenSymbol d) in
+    let (d', f') = FaceSymbol f # (j-i-1) ?: DegenSymbol d in
     let (d'', f'') = headShift 1 f' # DegenSymbol [2] in
-      (headCons i d' <> d'', f'')
+      ((i ?: d') <> d'', f'')
 
 data FormalDegen a  -- writer monad
   = FormalDegen {
@@ -96,13 +98,17 @@ instance Monad FormalDegen where
       FormalDegen b (d <> d')
 
 -- These functions don't depend on a at all.
--- TODO separate
+-- TODO separate, and eliminate outside references to the internals
 isDegen :: FormalDegen a -> Bool
 isDegen (FormalDegen _ (DegenSymbol [])) = True
 isDegen _ = False
 
+-- | Applies a formal degeneracy symbol to an already degenerate simplex.
+degen' :: DegenSymbol -> FormalDegen a -> FormalDegen a
+degen' d (FormalDegen a d') = FormalDegen a (d <> d')
+
 degen :: FormalDegen a -> Int -> FormalDegen a
-degen (FormalDegen a d) i = FormalDegen a (primDegen i <> d)
+degen s i = degen' (primDegen i) s
 
 nonDegen :: a -> FormalDegen a
 nonDegen a = FormalDegen a mempty
@@ -117,8 +123,7 @@ degenList = helper 0 . dsymbol . degenSymbol
 degenCount :: DegenSymbol -> Int
 degenCount (DegenSymbol d) = sum d - length d
 
--- In this representation, we just need to check that the index is
--- somewhere in the list. (Not necessarily the first thing)
+-- | Checks whether a vertex is in a degenerate face
 isImageOfDegen :: FormalDegen a -> Int -> Bool
 isImageOfDegen (FormalDegen a (DegenSymbol d)) = helper d
   where
@@ -128,8 +133,17 @@ isImageOfDegen (FormalDegen a (DegenSymbol d)) = helper d
                     | n  == x-1 = False
                     | otherwise = helper xs (n-x)
 
+-- | Constant simplex at specified dimension
 constantAt :: a -> Int -> FormalDegen a
-constantAt a n = FormalDegen a (headCons n mempty)
+constantAt a n = FormalDegen a (n ?: mempty)
+
+-- | If the zeroth vertex is not degenerate, removes it.
+-- Otherwise returns `Nothing`.
+-- Used in simplicial principal bundles.
+knockOff :: DegenSymbol -> Maybe DegenSymbol
+knockOff (DegenSymbol []) = Just (DegenSymbol [])
+knockOff (DegenSymbol (1:xs)) = Just (DegenSymbol xs)
+knockOff _ = Nothing
 
 -- `allDegens m n` lists all the degeneracy symbols [m] -> [n]
 allDegens :: Int -> Int -> [DegenSymbol]
@@ -144,19 +158,16 @@ allDegens m n
 
 -- The following are dangerous and only make sense in certain situations.
 downshiftN :: Int -> FormalDegen a -> FormalDegen a  -- seems to assume n >= 0
-downshiftN n (FormalDegen a (DegenSymbol d)) = FormalDegen a (DegenSymbol $ helper n d)
-  where
-    helper :: Int -> [Int] -> [Int]
-    helper 0 xs = xs
-    helper n [] = []
-    helper n xs =
-      if last xs == 2 then
-        init xs ++ replicate n 1 ++ [2]
-      else
-        init xs ++ [last xs - 1] ++ replicate (n-1) 1 ++ [2]
+downshiftN n (FormalDegen a (DegenSymbol d)) =
+  FormalDegen a (DegenSymbol (replicate n 1 ++ d))
 
 downshift :: FormalDegen a -> FormalDegen a
 downshift = downshiftN 1
+
+upshift :: FormalDegen a -> FormalDegen a
+upshift (FormalDegen a (DegenSymbol (1:d))) = (FormalDegen a (DegenSymbol d))
+upshift (FormalDegen a (DegenSymbol (n:d))) = (FormalDegen a (n-1 ?: DegenSymbol d))
+upshift (FormalDegen a (DegenSymbol [])) = (FormalDegen a (DegenSymbol []))
 
 -- Composition with a face map, represented as a decreasing sequence of
 -- generating face maps

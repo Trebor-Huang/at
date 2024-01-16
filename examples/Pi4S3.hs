@@ -15,12 +15,12 @@ kz3 = Wbar (Wbar kz1)
 
 classifying :: Morphism Sphere (Wbar (Wbar KZ1))
 classifying = Morphism m
-  where m Cell = NonDegen $ WbarSimplex [
-              NonDegen (WbarSimplex [NonDegen [1], NonDegen []]),
-              Degen 0 (NonDegen (WbarSimplex [])),
-              NonDegen (WbarSimplex [])
+  where m Cell = nonDegen $ WbarSimplex [
+              nonDegen (WbarSimplex [nonDegen [1], nonDegen []]),
+              (FormalDegen (WbarSimplex []) (DegenSymbol [2])),
+              nonDegen (WbarSimplex [])
             ]
-        m Basepoint = NonDegen $ WbarSimplex []
+        m Basepoint = nonDegen $ WbarSimplex []
 
 fibration :: Twist Sphere (Wbar KZ1)
 fibration = pullback kz3 kz2 (canonicalTwist kz2) classifying

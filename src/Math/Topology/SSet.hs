@@ -141,7 +141,7 @@ isImageOfDegen (FormalDegen a (DegenSymbol d)) = helper d
 
 -- | Constant simplex at specified dimension
 constantAt :: a -> Int -> FormalDegen a
-constantAt a n = FormalDegen a (n ?: NonDegen)
+constantAt a n = FormalDegen a ((n+1) ?: NonDegen)
 
 -- | If the zeroth vertex is not degenerate, removes it.
 -- Otherwise returns `Nothing`.

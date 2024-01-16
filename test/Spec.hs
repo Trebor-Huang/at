@@ -81,9 +81,9 @@ spec = do
   describe "efficient K(ℤ/2,1)" $ do -- TODO looks stuck in a loop
     let p = KZmod2_1
     describe "SSet" $
-      SSetProperties.check 1 p
+      SSetProperties.check 5 p
     describe "SGrp" $
-      SGrpProperties.check 1 p
+      SGrpProperties.check 5 p
 
   describe "K(ℤ,1)" $ do
     let p = WbarDiscrete Z

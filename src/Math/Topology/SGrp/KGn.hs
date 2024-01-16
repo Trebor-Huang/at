@@ -12,6 +12,7 @@ module Math.Topology.SGrp.KGn where
 
 import Control.Category.Constrained ((.))
 import Data.Coerce
+import Data.List
 import Math.Algebra.Combination
 import Math.Algebra.ChainComplex as CC hiding (FiniteType, Morphism)
 import qualified Math.Algebra.ChainComplex as CC
@@ -105,9 +106,8 @@ instance SSet KZmod2_1 where
 
   geomSimplexDim _ s = s
 
-  geomFace _ 0 _ = undefined
-  geomFace _ s 0 = nonDegen (s - 1)
-  geomFace _ s i | s == i = nonDegen (s - 1)
+  geomFace _ 0 _ = error "KZmod2_1 geomFace: Attempt to calculate face of a point"
+  geomFace _ s i | 0 == i || s == i = nonDegen (s - 1)
   geomFace _ s i = FormalDegen (s-2) (primDegen (i-1))
 
 instance Pointed KZmod2_1 where
@@ -120,24 +120,26 @@ instance FiniteType KZmod2_1 where
 
 instance Effective KZmod2_1
 
-mergeSorted :: Ord a => [a] -> [a] -> [a]
-mergeSorted is [] = is
-mergeSorted [] js = js
-mergeSorted (i : is) (j : js)
-  | i > j = i : mergeSorted is (j : js)
-  | otherwise = j : mergeSorted (i : is) js
-
-complement :: Int -> [Int] -> [Int]
-complement (-1) [] = []
-complement n [] = n : complement (n - 1) []
-complement n (i : is)
-  | n == i = complement (n -1) is
-  | otherwise = n : complement (n - 1) (i : is)
-
 instance SGrp KZmod2_1 where
-  prodMor _ = Morphism $ \(s, t) ->
-    let m = mergeSorted (degenList s) (degenList t)
-     in foldr (flip degen) (nonDegen $ length m) (complement (simplexDim KZmod2_1 s - 1) m)
+  prodMor _ = Morphism $ \ (s, t) ->
+    let bs = toBits (degenSymbol s) in
+    let bt = toBits (degenSymbol t) in
+    let b = take (simplexDim KZmod2_1 s) $ zipWith (/=) bs bt in
+      FormalDegen (length (filter id b)) $ fromBits $ b
+    where
+      toBits :: DegenSymbol -> [Bool]
+      toBits = intercalate [True]
+             . map (\d -> replicate (d-1) False)
+             . (++ repeat 1)  -- make it infinite
+             . dsymbol
+
+      fromBits :: [Bool] -> DegenSymbol
+      fromBits xs =  -- expects a finite result
+        let (rs, xs') = span not xs in
+          (length rs + 1) ?:
+            case xs' of
+              [] -> NonDegen
+              (_:xs'') -> fromBits xs''
   invMor _ = Morphism nonDegen
 
 instance SAb KZmod2_1

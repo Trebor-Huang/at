@@ -301,6 +301,26 @@ instance Constrained.Category UMorphism where
 instance Constrained.Functor UMorphism (->) FormalDegen where
   fmap = onSimplex
 
+-- Represents degen/face symbols as tabulated maps for debug purposes
+-- Note that these produces infinite lists.
+
+-- The first argument is the starting index, should be zero
+-- for anything other than internal purposes.
+slowDegen :: Int -> DegenSymbol -> [Int]
+slowDegen n (DegenSymbol []) = [n..]
+slowDegen n (DegenSymbol (x:xs)) = replicate x n ++ slowDegen (n+1) (DegenSymbol xs)
+
+-- Remember to cutoff the list yourself
+quickDegen :: [Int] -> DegenSymbol
+quickDegen [] = NonDegen
+quickDegen xs = let (seg, xs') = span (== head xs) xs in
+  length seg ?: quickDegen xs'
+
+slowFace :: Int -> FaceSymbol -> [Int]
+slowFace n (FaceSymbol []) = [n..]
+slowFace n (FaceSymbol (x:xs)) = [n..n+x-1] ++ slowFace (n+x+1) (FaceSymbol xs)
+
+
 -- Reid Barton:
 -- https://categorytheory.zulipchat.com/#narrow/stream/241590-theory.3A-
 -- algebraic.20topology.20.26.20homological.20algebra/topic/describing.

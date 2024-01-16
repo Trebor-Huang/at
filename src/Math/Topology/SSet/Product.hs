@@ -110,64 +110,34 @@ prodFunc m m' = Morphism $ \(s, t) -> prodNormalise (m `onSimplex` s, m' `onSimp
 -- together the above maps as required.
 
 instance (SSet a, SSet b) => DVF (Product a b) where
-  vf = status
+  vf = status where
+    incidenceFor :: Int -> Incidence  -- which face
+    incidenceFor ix = if even ix then Pos else Neg
 
--- TODO: in bit-field form this could be done by some efficient
--- twiddling
--- data Direction = X | Y | Diag | End
+    -- Takes a reversed coordinate list
+    search :: [(Int, Int)] -> Int -> Status [(Int, Int)]
+    search ((x0, y0):(x1, y1):(x2, y2):xs) i
+      | x0 == x1 + 1 &&
+        x1 == x2 &&
+        y0 == y1 &&
+        y1 == y2 + 1
+        = Target ((x0,y0):(x2,y2):xs) (incidenceFor (i-1))
+    search ((x0, y0):(x1, y1):xs) i
+      | x0 == x1 + 1 &&
+        y0 == y1 + 1
+        = Source ((x0,y0):(x1,y0):(x1,y1):xs) (incidenceFor i)
+    search (c:coords) i = fmap (c:) $ search coords (i-1)
+    search [] i = Critical
 
--- Walking backwards from (p,q) to (0,0)
--- spathStep :: (Int, Simplex a, Simplex b) -> (Direction, (Int, Simplex a, Simplex b))
--- spathStep = undefined
--- spathStep (0, _, _) = (End, undefined)
--- spathStep (q, Degen i s, t) | i + 1 == q = (X, (q - 1, s, t))
--- spathStep (q, s, Degen j t) | j + 1 == q = (Y, (q - 1, s, t))
--- spathStep (q, s, t) = (Diag, (q - 1, s, t))
-
--- spathUnstep :: Direction -> (Int, Simplex a, Simplex b) -> (Int, Simplex a, Simplex b)
--- spathUnstep = undefined
--- spathUnstep Diag (q, s, t) = (q + 1, s, t)
--- spathUnstep X (q, s, t) = (q + 1, Degen q s, t)
--- spathUnstep Y (q, s, t) = (q + 1, s, Degen q t)
--- spathUnstep End (q, s, t) = undefined
-
-incidenceFor :: Int -> Incidence  -- which face
-incidenceFor ix = if even ix then Pos else Neg
-
-eventSearch :: DegenSymbol -> DegenSymbol -> Int -> Status DegenSymbol
-eventSearch (DegenSymbol (x:xs)) (DegenSymbol (y:ys)) i
-  | x == y = undefined
-  | x == y+1 = undefined
-eventSearch _ _ _ = Critical
-
--- Little worried about signs in here, likely off by 1
--- statusStep :: (SSet a, SSet b) => Product a b -> (Int, Simplex a, Simplex b) -> Status (Int, Simplex a, Simplex b)
--- statusStep prd qst = case spathStep qst of
---   -- Simplex is a target
---   (Y, qst')
---     | (X, (q'', s'', t'')) <- spathStep qst' ->
---       Target (spathUnstep Diag (q'', s'', t'')) (incidenceFor (q'' + 1))
---   -- Simplex is a source
---   (Diag, (q', s', t')) ->
---     Source
---       (spathUnstep Y $ spathUnstep X (q', s', t'))
---       (incidenceFor (q' + 1))
---   -- Simplex is critical
---   (End, _) -> Critical
---   -- Keep searching
---   (d, qst') -> fmap (spathUnstep d) (statusStep prd qst')
-
-status :: (SSet a, SSet b) => Product a b -> (Simplex a, Simplex b) -> Status (Simplex a, Simplex b)
--- status (Product a b) (s, t) =
---   fmap (\(_, s, t) -> (s, t)) $
---     statusStep
---       (Product a b)
---       ( simplexDim a s,
---         s,
---         t
---       )
-status (Product a b) (s, t) = fmap (\ d -> undefined) $
-  eventSearch (degenSymbol s) (degenSymbol t) 0
+    status :: (SSet a, SSet b) => Product a b -> (Simplex a, Simplex b) -> Status (Simplex a, Simplex b)
+    status (Product a b) (FormalDegen s d, FormalDegen t d') =
+      let dim = simplexDim a (FormalDegen s d) in
+      let sd = reverse $ take (dim+1) $ slowDegen 0 d in
+      let sd' = reverse $ take (dim+1) $ slowDegen 0 d' in
+      let wrap (sd, sd') =
+            (FormalDegen s (quickDegen (reverse sd)),
+             FormalDegen t (quickDegen (reverse sd'))) in
+      fmap (wrap . unzip) $ search (zip sd sd') dim
 
 
 stripProduct :: (Simplex a, Simplex b) -> (GeomSimplex a, GeomSimplex b)

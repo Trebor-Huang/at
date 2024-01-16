@@ -3,17 +3,51 @@ module SSetProperties where
 
 import Control.Monad (forM_, unless, when)
 import Test.Hspec
-import Prelude hiding (id, (.))
-
+import Test.QuickCheck
 import Math.Topology.SSet
 import Math.Topology.SSet.Product
 import Math.Topology.SSet.TwistedProduct
 import Math.Topology.SGrp
+import ArbitraryInstances ()
+
+slowCompose :: [Int] -> [Int] -> [Int]
+slowCompose p q = map ((q !!) . (p !!)) [0..]
+
+prop_dComposeCorrect :: DegenSymbol -> DegenSymbol -> Bool
+prop_dComposeCorrect d1 d2 =
+  case d1 <> d2 of
+    NonDegen -> True
+    DegenSymbol d  ->
+      last d /= 1 &&
+      let len =
+            (sum (dsymbol d1) + length (dsymbol d1)) +
+            (sum (dsymbol d2) + length (dsymbol d2)) in
+        take len (slowDegen 0 d1 `slowCompose` slowDegen 0 d2)
+          == take len (slowDegen 0 (DegenSymbol d))
+
+prop_exchangeCorrect :: FaceSymbol -> DegenSymbol -> Bool
+prop_exchangeCorrect f d =
+  let (d', f') = f # d in
+  let len =
+        (sum (fsymbol f) + length (fsymbol f)) +
+        (sum (dsymbol d) + length (dsymbol d)) in
+    take len (slowFace 0 f `slowCompose` slowDegen 0 d)
+      == take len (slowDegen 0 d' `slowCompose` slowFace 0 f')
+    && if length (dsymbol d') > 0 then
+      last (dsymbol d') /= 1
+    else True
+
+checkSSetSymbols :: Spec
+checkSSetSymbols = do
+  it "should compose correctly" $
+    property prop_dComposeCorrect
+  it "should exchange correctly" $
+    property prop_exchangeCorrect
 
 checkIdentities :: (SSet a, Show (GeomSimplex a)) => a -> GeomSimplex a -> Expectation
 checkIdentities a g = do
   let d = geomSimplexDim a g
-      s = NonDegen g
+      s = nonDegen g
 
   -- it "satisfies the simplicial identity ∂i ∘ ∂j = ∂(j-1) ∘ ∂i if i < j" $
   when (d > 1) $
@@ -36,7 +70,9 @@ checkIdentities a g = do
   sequence_ $ do
     j <- [1 .. d]
     i <- [0 .. (j - 1)]
-    return $ face a (degen s j) i `shouldBe` degen (face a s i) (j - 1)
+    return $ 
+      unless (face a (degen s j) i == degen (face a s i) (j - 1)) $
+        expectationFailure $ "∂" ++ show i ++ " ∘ s" ++ show j ++ " on " ++ show s
 
   -- it "satisfies the simplicial identity ∂j ∘ sj = id" $
   sequence_ $ do
@@ -98,7 +134,7 @@ check n a = do
 checkMorphismFaces :: (SSet a, SSet b, Show (GeomSimplex a), Show (GeomSimplex b)) => a -> b -> Morphism a b -> GeomSimplex a -> Expectation
 checkMorphismFaces a b m g = do
   let d = geomSimplexDim a g
-      s = NonDegen g
+      s = nonDegen g
 
   when (d > 0) $
     sequence_ $ do
@@ -125,7 +161,7 @@ checkMorphismOn a b m gs = do
 checkTwistFaces :: (SSet a, SGrp b, Show (GeomSimplex a), Show (GeomSimplex b)) => a -> b -> Twist a b -> GeomSimplex a -> Expectation
 checkTwistFaces a b m g = do
   let d = geomSimplexDim a g
-      s = NonDegen g
+      s = nonDegen g
       twistOn = twistOnFor a b
 
   when (d > 0) $ do

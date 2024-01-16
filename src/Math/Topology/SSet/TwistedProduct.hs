@@ -88,7 +88,7 @@ instance (FiniteType b, FiniteType f, SGrp g) => FiniteType (TwistedProduct f b 
   geomBasis (TwistedProduct f b _ _ _) n = [ TwistedProductSimplex (s, t) | s <- allSimplices f n, t <- allSimplices b n, isGeomSimplex (Product f b) (s, t)]
 
 instance (SSet f, SSet b, SGrp g) => DVF (TwistedProduct f b g) where
-  vf (TwistedProduct f b g _ _) (TwistedProductSimplex s) = coerce $ status (Product f b) s
+  vf (TwistedProduct f b g _ _) (TwistedProductSimplex s) = coerce $ vf (Product f b) s
 
 totalSpaceChainsIso ::
   CC.Morphism

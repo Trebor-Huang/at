@@ -16,7 +16,7 @@ instance Show DegenSymbol where
   show (DegenSymbol d) = show d
 
 primDegen :: Int -> DegenSymbol
-primDegen n = DegenSymbol $ replicate n 1 ++ [2] -- TODO more efficient
+primDegen n = DegenSymbol $ replicate n 1 ++ [2]
 
 pattern NonDegen :: DegenSymbol
 pattern NonDegen = DegenSymbol []
@@ -59,7 +59,7 @@ headShift k (FaceSymbol (x:xs)) = FaceSymbol (x+k:xs)
 x ?: (DegenSymbol d) = DegenSymbol (x:d)
 infixr 5 ?:
 
-infix 4 #
+infix 4 #  -- TODO make faster
 -- exchanges --f-> --d-> to --d'-> --f'->
 (#) :: FaceSymbol -> DegenSymbol -> (DegenSymbol, FaceSymbol)
 FaceSymbol [] # d = (d, FaceSymbol [])
@@ -106,8 +106,7 @@ instance Monad FormalDegen where
 -- These functions don't depend on a at all.
 -- TODO separate, and eliminate outside references to the internals
 isDegen :: FormalDegen a -> Bool
-isDegen (FormalDegen _ NonDegen) = False
-isDegen _ = True
+isDegen s = degenSymbol s == NonDegen
 
 -- | Applies a formal degeneracy symbol to an already degenerate simplex.
 degen' :: DegenSymbol -> FormalDegen a -> FormalDegen a
@@ -119,37 +118,12 @@ degen s i = degen' (primDegen i) s
 nonDegen :: a -> FormalDegen a
 nonDegen a = FormalDegen a NonDegen
 
-degenList :: FormalDegen a -> [Int]
-degenList = helper 0 . dsymbol . degenSymbol
-  where
-    helper :: Int -> [Int] -> [Int]
-    helper _ [] = []
-    helper n (x:xs) = [n..n+x-1] ++ helper (n+x) xs
-
 degenCount :: DegenSymbol -> Int
 degenCount (DegenSymbol d) = sum d - length d
-
--- | Checks whether a vertex is in a degenerate face
-isImageOfDegen :: FormalDegen a -> Int -> Bool
-isImageOfDegen (FormalDegen a (DegenSymbol d)) = helper d
-  where
-    helper :: [Int] -> Int -> Bool
-    helper [] _ = False
-    helper (x:xs) n | n  <  x-1 = True
-                    | n  == x-1 = False
-                    | otherwise = helper xs (n-x)
 
 -- | Constant simplex at specified dimension
 constantAt :: a -> Int -> FormalDegen a
 constantAt a n = FormalDegen a ((n+1) ?: NonDegen)
-
--- | If the zeroth vertex is not degenerate, removes it.
--- Otherwise returns `Nothing`.
--- Used in simplicial principal bundles.
-knockOff :: DegenSymbol -> Maybe DegenSymbol
-knockOff NonDegen = Just NonDegen
-knockOff (DegenSymbol (1:xs)) = Just (DegenSymbol xs)
-knockOff _ = Nothing
 
 -- `allDegens m n` lists all the degeneracy symbols [m] -> [n]
 allDegens :: Int -> Int -> [DegenSymbol]
@@ -161,9 +135,16 @@ allDegens m n
   DegenSymbol d <- allDegens (m-k) (n-1)
   return $ DegenSymbol (k:d)
 
+-- | If the zeroth vertex is not degenerate, removes it.
+-- Otherwise returns `Nothing`.
+-- Used in simplicial principal bundles.
+knockOff :: DegenSymbol -> Maybe DegenSymbol
+knockOff NonDegen = Just NonDegen
+knockOff (DegenSymbol (1:xs)) = Just (DegenSymbol xs)
+knockOff _ = Nothing
 
--- The following are dangerous and only make sense in certain situations.
-downshiftN :: Int -> FormalDegen a -> FormalDegen a  -- seems to assume n >= 0
+-- | Inserts n non-degenerate vertices at the head
+downshiftN :: Int -> FormalDegen a -> FormalDegen a
 downshiftN n (FormalDegen a NonDegen) = nonDegen a
 downshiftN n (FormalDegen a (DegenSymbol d)) =
   FormalDegen a (DegenSymbol (replicate n 1 ++ d))
@@ -171,27 +152,11 @@ downshiftN n (FormalDegen a (DegenSymbol d)) =
 downshift :: FormalDegen a -> FormalDegen a
 downshift = downshiftN 1
 
+-- | Removes one vertex at the head
 upshift :: FormalDegen a -> FormalDegen a
 upshift (FormalDegen a (DegenSymbol (1:d))) = FormalDegen a (DegenSymbol d)
 upshift (FormalDegen a (DegenSymbol (n:d))) = FormalDegen a (n-1 ?: DegenSymbol d)
 upshift (FormalDegen a NonDegen) = FormalDegen a NonDegen
-
--- Composition with a face map, represented as a decreasing sequence of
--- generating face maps
--- Is this even used at all
-
--- unDegen :: FormalDegen a -> [Int] -> FormalDegen a
--- unDegen (FormalDegen a d) f = FormalDegen a (DegenSymbol (helper (differ f) d))
---   where
---     helper f d =
---       let (d', f') = f # d in
---       if f' /= FaceSymbol [] then
---         error "IMPOSSIBLE: unDegen"
---       else
---         dsymbol d'
-
---     differ f = let f' = reverse f in
---       FaceSymbol $ zipWith (\ a b -> a - b - 1) f' (0:f')
 
 type Simplex a = FormalDegen (GeomSimplex a)
 

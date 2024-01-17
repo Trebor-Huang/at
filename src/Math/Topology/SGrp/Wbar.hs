@@ -77,11 +77,6 @@ normalise g (s : ss) = downshift $ fmap (\(s, t) -> WbarSimplex (s : unnormalise
   where
     p = prodNormalise (s, normalise g ss)
 
--- insertUnit :: (Pointed g) => g -> Int -> [Simplex g] -> [Simplex g]
--- insertUnit g 0 ss = constantAt (basepoint g) (length ss) : ss
--- insertUnit g i (s : ss) = degen s (i - 1) : insertUnit g (i - 1) ss
--- insertUnit g i _ = error "insertUnit: impossible"
-
 unnormalise :: (Pointed g) => g -> Simplex (Wbar g) -> [Simplex g]
 unnormalise g (FormalDegen (WbarSimplex s) d)
   = helper g s (dsymbol d)

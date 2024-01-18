@@ -6,7 +6,6 @@ module Math.Algebra.Bicomplex where
 
 import Math.Algebra.ChainComplex hiding (FiniteType)
 import qualified Math.Algebra.ChainComplex as CC (FiniteType)
-import qualified Data.Map.Lazy as Map
 import Math.Algebra.Combination
 import Prelude hiding (id, return, (.))
 
@@ -44,7 +43,7 @@ class Bicomplex a => FiniteType a where
 type Bimorphism a b = UMorphism Bidegree (Bibasis a) (Bibasis b)
 
 validBicomb :: Bicomplex a => a -> Combination (Bibasis a) -> Bool
-validBicomb a (Combination bs) = all (isBibasis a) $ Map.keys bs
+validBicomb a bs = all (isBibasis a) $ support bs
 
 newtype Tot a = Tot a
 

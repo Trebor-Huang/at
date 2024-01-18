@@ -4,7 +4,6 @@
 module Math.Algebra.ChainComplex.Hom where
 
 import qualified Control.Category.Constrained as Constrained
-import qualified Data.Map.Lazy as Map
 
 import Prelude hiding (Bounded, id, (.))
 
@@ -30,8 +29,8 @@ instance (FiniteType a, ChainComplex b) => ChainComplex (Hom a b) where
   diff (Hom a b) = Morphism (-1) $ \(HomBasis s t) ->
     let n = degree (Hom a b) (HomBasis s t) in
     (HomBasis s <$> diff b `onBasis` t) +
-    (kozulRule negate (n + 1) $ Combination $ Map.fromList $
-      fmap (\s' -> (HomBasis s' t, diff a `onBasis` s' `coeffOf` s))
+    (kozulRule negate (n + 1) $ sum $
+      fmap (\s' -> singleComb' (diff a `onBasis` s' `coeffOf` s) (HomBasis s' t))
         (basis a (n + 1)))
 
 instance (FiniteType a, FiniteType b, Bounded b) => FiniteType (Hom a b) where
@@ -46,8 +45,8 @@ instance (FiniteType a, FiniteType b, Bounded b) => FiniteType (Hom a b) where
 homcontramap :: (FiniteType a, ChainComplex a', ChainComplex b) => a -> a' -> Morphism a a' -> Morphism (Hom a' b) (Hom a b)
 homcontramap a a' m = Morphism 0 $ \(HomBasis s' t) ->
   let abasis = basis a (degree a' s') in
-  normalise $ Combination $ Map.fromListWith (+) $
-    fmap (\s -> (HomBasis s t, m `onBasis` s `coeffOf` s')) abasis
+  sum $ fmap (\s -> singleComb' (m `onBasis` s `coeffOf` s') (HomBasis s t))
+    abasis
 
 hommap :: Morphism b b' -> Morphism (Hom a b) (Hom a b')
 hommap m = Morphism 0 $ \(HomBasis s t) -> HomBasis s <$> m `onBasis` t

@@ -31,6 +31,7 @@ instance (FiniteType a, FiniteType b) => FiniteType (Tensor a b) where
 
 tensorCombination :: (Eq a, Eq b) => Combination a -> Combination b -> Combination (a, b)
 tensorCombination (Combination as) (Combination bs) =
+  -- this is ascending so we allow ourselves to break the abstraction a little bit
   Combination $ Map.fromAscList $ do
     (a, c) <- Map.toAscList as
     (b, d) <- Map.toAscList bs

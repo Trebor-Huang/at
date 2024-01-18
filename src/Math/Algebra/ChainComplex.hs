@@ -7,7 +7,6 @@ module Math.Algebra.ChainComplex where
 import Control.Category.Constrained (id, incl, join, (.))
 import qualified Control.Category.Constrained as Constrained
 import Data.Coerce
-import qualified Data.Map.Lazy as Map
 import qualified Data.Matrix as M
 import Prelude hiding (Bounded, id, return, (.))
 
@@ -55,7 +54,7 @@ instance Bounded () where
   amplitude _ = [0]
 
 validComb :: ChainComplex a => a -> Chain a -> Bool
-validComb a (Combination bs) = all (isBasis a) $ Map.keys bs
+validComb a bs = all (isBasis a) $ support bs
 
 -- well, not really
 kozulRule :: (b -> b) -> Int -> b -> b
@@ -141,8 +140,8 @@ toChainGrpElt a n cs = AbGroupPresElt $ M.fromList 1 (length r) (fmap (fromInteg
 
 -- TODO ensure ascending list so that this can be faster?
 fromChainGrpElt :: (FiniteType a) => a -> Int -> AbGroupPresElt -> Chain a
-fromChainGrpElt a n (AbGroupPresElt m) = normalise $ Combination $
-  Map.fromList $ zip (basis a n) (fromIntegral <$> M.toList m)
+fromChainGrpElt a n (AbGroupPresElt m) = fromListNoDup $
+  zip (basis a n) (fromIntegral <$> M.toList m)
 
 chainGroup :: FiniteType a => a -> Int -> AbGroupPres
 -- chainGroup a n | n < 0 = zero

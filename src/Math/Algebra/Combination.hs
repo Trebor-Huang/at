@@ -4,8 +4,8 @@ import Control.Category.Constrained (join, return)
 import qualified Control.Category.Constrained as Constrained
 import Data.Map.Lazy (Map)
 import qualified Data.Map.Lazy as Map
-import Unsafe.Coerce
 import Data.Map.Merge.Lazy
+import Unsafe.Coerce
 import Data.Maybe (fromMaybe)
 import Prelude hiding (id, return)
 
@@ -76,6 +76,10 @@ coeffOf (Combination l) b = fromMaybe 0 $ Map.lookup b l
 -- | Prunes away the zeroes
 normalise :: (Ord b) => Combination b -> Combination b
 normalise (Combination m) = Combination $ Map.filter (/= 0) m
+
+-- | Creates a combination from a list of coefficients without duplicate entries.
+fromListNoDup :: (Ord b) => [(b, Int)] -> Combination b
+fromListNoDup = normalise . Combination . Map.fromList
 
 instance Constrained.Functor (Constrained.Sub Ord (->)) (->) Combination where
   fmap (Constrained.Sub f) (Combination cs) = normalise $ Combination $

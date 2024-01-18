@@ -84,7 +84,7 @@ tensorAlgFunc ::
   (ChainComplex a, ChainComplex b) =>
   Morphism a b ->
   Morphism (TensorSusp a) (TensorSusp b)
-tensorAlgFunc (Morphism deg f) = Morphism deg (coerceCombination $ traverse @[] f)
+tensorAlgFunc (Morphism deg f) = Morphism deg $ coerceCombination $ traverseComb f
 
 instance (Algebra a, FiniteType a) => Bi.FiniteType (TensorSusp a) where
   bibasis (TensorSusp a) (hd, vd) = TensorSuspBibasis <$> go vd hd
@@ -103,7 +103,7 @@ instance (Algebra a, FiniteType a) => FiniteType (TensorSusp a) where
 verth :: (ChainComplex a) => Morphism a a -> Morphism a a -> [Basis a] -> Combination [Basis a]
 verth h gf [] = 0
 verth h gf (b:bs) =
-  liftA2 (:) (h `onBasis` b)
+  liftA2Comb (:) (h `onBasis` b)
     (coerceCombination (tensorAlgFunc gf `onBasis` TensorSuspBasis (TotBasis (TensorSuspBibasis bs))))
   + fmap (b:) (verth h gf bs)
 
@@ -173,7 +173,7 @@ barFunc ::
   (ChainComplex a, ChainComplex b) =>
   Morphism a b ->
   Morphism (Bar a) (Bar b)
-barFunc (Morphism deg f) = Morphism deg (coerceCombination $ traverse @[] f)
+barFunc (Morphism deg f) = Morphism deg $ coerceCombination (traverseComb f)
 
 horizPerturbation :: (Algebra a) => a -> Morphism (TensorSusp a) (TensorSusp a)
 horizPerturbation a = Morphism (-1) $ coerceCombination $ underlyingFunction $ hdiff (Bar a)

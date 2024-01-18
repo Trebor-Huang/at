@@ -20,6 +20,7 @@ newtype Combination b = Combination {coeffs :: Map b Int}
 coerceCombination :: a -> b
 coerceCombination = unsafeCoerce  -- TODO can we type-safeguard this?
 
+-- Collection of stuff that doesn't require the order instance
 zeroComb :: Combination b
 zeroComb = Combination $ Map.empty
 
@@ -32,18 +33,16 @@ singleComb' c b = Combination $ Map.singleton b c
 negComb :: Combination b -> Combination b
 negComb (Combination a) = Combination $ Map.map negate a
 
+support :: Combination b -> [b]
+support = Map.keys . coeffs
+
+(.*) :: Int -> Combination b -> Combination b
+0 .* (Combination bs) = zeroComb
+n .* (Combination bs) = Combination $ Map.map (n *) bs
+
 -- This is dangerous and requires `f` to be monotonic
 instance Functor Combination where
   fmap f (Combination m) = Combination $ Map.mapKeysMonotonic f m
-
-instance Applicative Combination where
-  pure = singleComb
-  Combination fs <*> Combination as = Combination $
-    error "Combination <*>: not implemented"
-  -- Combination fs <*> Combination as = Combination $ do
-  --   (fc, f) <- fs
-  --   (ac, a) <- as
-  --   return (fc * ac, f a)
 
 -- TODO: obviously make this a hashmap, possibly with special cases
 -- for very small combinations? Unless hashmap alreayd does this.
@@ -78,15 +77,6 @@ coeffOf (Combination l) b = fromMaybe 0 $ Map.lookup b l
 normalise :: (Ord b) => Combination b -> Combination b
 normalise (Combination m) = Combination $ Map.filter (/= 0) m
 
-(.*) :: Int -> Combination b -> Combination b
-0 .* (Combination bs) = zeroComb
-n .* (Combination bs) = Combination $ Map.map (n *) bs
-
--- TODO: generalise via Constrained.Traversable
--- traverseComb :: (Eq b) => (a -> Combination b) -> [a] -> Combination [b]
--- traverseComb f [] = 0
--- traverseComb f (a:as) = liftA2 (:)
-
 instance Constrained.Functor (Constrained.Sub Ord (->)) (->) Combination where
   fmap (Constrained.Sub f) (Combination cs) = normalise $ Combination $
     Map.mapKeysWith (+) f cs
@@ -98,6 +88,15 @@ instance Constrained.Monad (Constrained.Sub Ord (->)) Combination where
   return = Constrained.Sub $ singleComb
   join = Constrained.Sub $ \(Combination cs) ->
     Map.foldlWithKey (\ cum el coe -> cum + coe .* el) 0 cs
+
+liftA2Comb :: (Ord c) => (a -> b -> c) -> Combination a -> Combination b -> Combination c
+liftA2Comb f (Combination as) (Combination bs) = normalise $ Combination $ -- got to be a better way
+  Map.fromListWith (+) [(f a b, ca * cb) | (a, ca) <- Map.toList as, (b, cb) <- Map.toList bs]
+
+-- TODO: generalise via Constrained.Traversable
+traverseComb :: (Ord b) => (a -> Combination b) -> [a] -> Combination [b]
+traverseComb f [] = 0
+traverseComb f (a:as) = liftA2Comb (:) (f a) (traverseComb f as)
 
 instance Ord b => Num (Combination b) where
   fromInteger 0 = zeroComb

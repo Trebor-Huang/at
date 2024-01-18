@@ -6,6 +6,7 @@ import Control.Monad (forM_)
 import Math.Algebra.Bicomplex
 import Math.Algebra.ChainComplex
 import Math.Algebra.Combination
+import qualified Data.Map.Lazy as Map
 import Test.Hspec
 import Prelude hiding (id, (.))
 
@@ -19,8 +20,9 @@ checkChainConditions a as = do
     forM_
       as
       ( \b ->
-          let (h, v) = bidegree a b
-           in forM_ (coeffs $ vdiff a `onBasis` b) (\(_, c) -> bidegree a c `shouldBe` (h, v - 1))
+          let (h, v) = bidegree a b in
+            forM_ (Map.keys $ coeffs $ vdiff a `onBasis` b)
+              (\ c -> bidegree a c `shouldBe` (h, v - 1))
       )
   it "∂v ∘ ∂v = 0" $ (vdiff a . vdiff a) `isZeroOnAll` as
   it "images under ∂h should be valid" $
@@ -29,8 +31,9 @@ checkChainConditions a as = do
     forM_
       as
       ( \b ->
-          let (h, v) = bidegree a b
-           in forM_ (coeffs $ hdiff a `onBasis` b) (\(_, c) -> bidegree a c `shouldBe` (h - 1, v))
+          let (h, v) = bidegree a b in
+            forM_ (Map.keys $ coeffs $ hdiff a `onBasis` b)
+              (\ c -> bidegree a c `shouldBe` (h - 1, v))
       )
 
   it "∂h ∘ ∂h = 0" $ (hdiff a . hdiff a) `isZeroOnAll` as

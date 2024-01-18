@@ -90,6 +90,7 @@ executables:
     ghc-options:
       - -O2
       - -main-is Temp
+      - -rtsopts
 
 library:
   source-dirs:
@@ -98,6 +99,7 @@ library:
     - vector
     - matrix
     - mtl
+    - containers
   ghc-options:
     - -Wall
     # - -Wno-missing-signatures
@@ -127,3 +129,4 @@ tests:
     - hspec
     - QuickCheck
     - random
+    - containers

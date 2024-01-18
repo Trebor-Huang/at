@@ -10,7 +10,7 @@ import Prelude hiding (Bounded)
 -- to 0, the next four to 1, and the last two to 2.
 -- Trailing 1s are pruned, this is an invariant.
 -- Note that we don't store the dom/cod dimensions, only the difference!
-newtype DegenSymbol = DegenSymbol { dsymbol :: [Int] } deriving (Eq)
+newtype DegenSymbol = DegenSymbol { dsymbol :: [Int] } deriving (Eq, Ord)
 
 instance Show DegenSymbol where
   show (DegenSymbol d) = show d
@@ -38,7 +38,7 @@ instance Monoid DegenSymbol where
 -- [3,4,0] means a map {0,...,9} -> {0,...,7}, by discarding
 -- 3, 8 and 9, moving the others forward.
 
-newtype FaceSymbol = FaceSymbol { fsymbol :: [Int] } deriving (Eq)
+newtype FaceSymbol = FaceSymbol { fsymbol :: [Int] } deriving (Eq, Ord)
 
 instance Show FaceSymbol where
   show (FaceSymbol d) = show d
@@ -84,12 +84,12 @@ data FormalDegen a  -- writer monad
     underlyingGeom :: a,  -- Dimension n
     degenSymbol :: DegenSymbol -- [m] -> [n]
   }
-  deriving (Eq, Functor)
+  deriving (Eq, Ord, Functor)
   deriving (Constrained.Functor (->) (->)) via (Constrained.Wrapped FormalDegen)
 
 instance Show a => Show (FormalDegen a) where
-  show b@(FormalDegen a d) =
-    if not (isDegen b) then
+  show (FormalDegen a d) =
+    if d == NonDegen then
       show a
     else
       "s_" ++ show d ++ " " ++ show a
@@ -106,7 +106,7 @@ instance Monad FormalDegen where
 -- These functions don't depend on a at all.
 -- TODO separate, and eliminate outside references to the internals
 isDegen :: FormalDegen a -> Bool
-isDegen s = degenSymbol s == NonDegen
+isDegen s = degenSymbol s /= NonDegen
 
 -- | Applies a formal degeneracy symbol to an already degenerate simplex.
 degen' :: DegenSymbol -> FormalDegen a -> FormalDegen a
@@ -160,7 +160,7 @@ upshift (FormalDegen a NonDegen) = FormalDegen a NonDegen
 
 type Simplex a = FormalDegen (GeomSimplex a)
 
-class Eq (GeomSimplex a) => SSet a where
+class Ord (GeomSimplex a) => SSet a where
   -- NOTE: Maybe this shouldn't be an associated type, instead just
   -- another parameter to the typeclass
 
@@ -224,7 +224,7 @@ class SSet a => FiniteType a where
 
 someSimplices :: (SSet a) => a -> Int -> (Int -> [GeomSimplex a]) -> [Simplex a]
 someSimplices a n f | n < 0 = []
-someSimplices a n f = [FormalDegen g d | k <- [0 .. n], g <- f n, d <- allDegens n k]
+someSimplices a n f = [FormalDegen g d | k <- [0 .. n], g <- f k, d <- allDegens n k]
 
 allSimplices :: (FiniteType a) => a -> Int -> [Simplex a]
 allSimplices a n = someSimplices a n (geomBasis a)

@@ -29,6 +29,7 @@ module Math.Topology.SSet.TwistedProduct where
 --
 
 import Data.Coerce
+import Math.Algebra.Combination (coerceCombination)
 import Math.Algebra.ChainComplex hiding (Morphism, FiniteType)
 import qualified Math.Algebra.ChainComplex as CC
 import Math.Algebra.ChainComplex.Equivalence
@@ -65,6 +66,7 @@ totalSpace b g tau = TwistedProduct g b g (prodMor g) tau
 newtype TwistedProductSimplex a g = TwistedProductSimplex a
 
 deriving instance (Eq a) => Eq (TwistedProductSimplex a g)
+deriving instance (Ord a) => Ord (TwistedProductSimplex a g)
 instance (Show a) => Show (TwistedProductSimplex a g) where
   show (TwistedProductSimplex a) = show a
 
@@ -116,4 +118,4 @@ instance
     composeLeft (NChains t) (isoToReduction totalSpaceChainsIso totalSpaceChainsIsoInv) $
     perturbLeft
         (eff (Product f b))
-        (coerce (diff (NChains (TwistedProduct f b g act tau))) - diff (NChains (Product f b)))
+        (coerceCombination (diff (NChains (TwistedProduct f b g act tau))) - diff (NChains (Product f b)))

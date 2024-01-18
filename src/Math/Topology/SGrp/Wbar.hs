@@ -33,7 +33,7 @@ newtype Wbar g = Wbar g
 newtype WbarSimplex a = WbarSimplex a
   deriving (Show) via a
   deriving (Functor)
-  deriving (Eq)
+  deriving (Eq, Ord)
 
 instance (SGrp g) => SSet (Wbar g) where
   -- A non-degenerate simplex is a list of simplices of `g`

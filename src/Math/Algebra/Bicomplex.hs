@@ -6,6 +6,7 @@ module Math.Algebra.Bicomplex where
 
 import Math.Algebra.ChainComplex hiding (FiniteType)
 import qualified Math.Algebra.ChainComplex as CC (FiniteType)
+import qualified Data.Map.Lazy as Map
 import Math.Algebra.Combination
 import Prelude hiding (id, return, (.))
 
@@ -24,7 +25,7 @@ instance Num Bidegree where
   abs = error "Bidegree: abs"
   signum = error "Bidegree: signum"
 
-class Eq (Bibasis a) => Bicomplex a where
+class Ord (Bibasis a) => Bicomplex a where
   type Bibasis a = s | s -> a
 
   isBibasis :: a -> Bibasis a -> Bool
@@ -43,12 +44,12 @@ class Bicomplex a => FiniteType a where
 type Bimorphism a b = UMorphism Bidegree (Bibasis a) (Bibasis b)
 
 validBicomb :: Bicomplex a => a -> Combination (Bibasis a) -> Bool
-validBicomb a (Combination bs) = and $ fmap (\(_, b) -> isBibasis a b) bs
+validBicomb a (Combination bs) = all (isBibasis a) $ Map.keys bs
 
 newtype Tot a = Tot a
 
 newtype TotBasis a = TotBasis a
-  deriving (Eq)
+  deriving (Eq, Ord)
   deriving (Show) via a
 
 instance (Bicomplex a) => ChainComplex (Tot a) where

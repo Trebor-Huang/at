@@ -7,6 +7,7 @@ module Math.Algebra.ChainComplex where
 import Control.Category.Constrained (id, incl, join, (.))
 import qualified Control.Category.Constrained as Constrained
 import Data.Coerce
+import qualified Data.Map.Lazy as Map
 import qualified Data.Matrix as M
 import Prelude hiding (Bounded, id, return, (.))
 
@@ -17,7 +18,7 @@ import Math.ValueCategory (Arrow)
 import Math.ValueCategory.Abelian
 import Math.ValueCategory.Additive
 
-class (Eq (Basis a)) => ChainComplex a where
+class (Ord (Basis a)) => ChainComplex a where
   type Basis a = s | s -> a
 
   isBasis :: a -> Basis a -> Bool
@@ -33,10 +34,11 @@ instance ChainComplex () where
   degree _ _ = 0
   diff _ = 0
 
-class ChainComplex a => FiniteType a where
+class (ChainComplex a) => FiniteType a where
   dim :: a -> Int -> Int
   dim a i = length (basis a i)
   -- * `all isSimplex (basis n)`
+  -- should be ascending list probably
   basis :: a -> Int -> [Basis a]
 
 instance FiniteType () where
@@ -53,11 +55,11 @@ instance Bounded () where
   amplitude _ = [0]
 
 validComb :: ChainComplex a => a -> Chain a -> Bool
-validComb a (Combination bs) = and $ fmap (\(_, b) -> isBasis a b) bs
+validComb a (Combination bs) = all (isBasis a) $ Map.keys bs
 
 -- well, not really
-kozulRule :: Num b => Int -> b -> b
-kozulRule n c = if even n then c else negate c
+kozulRule :: (b -> b) -> Int -> b -> b
+kozulRule negate n c = if even n then c else negate c
 
 -- NOTE: I don't think we ever use a variable morphism degree, so the
 -- degree could be lifted to the type level. Then again I think
@@ -74,13 +76,13 @@ underlyingFunction :: UMorphism d a b -> (a -> Combination b)
 underlyingFunction = onBasis
 
 instance Constrained.Functor (UMorphism d) (->) Combination where
-  fmap m c = incl (join @(Constrained.Sub Eq (->))) $ fmap (m `onBasis`) c
+  fmap m c = incl (join @(Constrained.Sub Ord (->))) $ fmap (m `onBasis`) c
 
-onComb :: (Eq a, Eq b) => UMorphism d a b -> Combination a -> Combination b
+onComb :: (Ord a, Ord b) => UMorphism d a b -> Combination a -> Combination b
 onComb = Constrained.fmap
 
 morphismZeroOfDeg :: d -> UMorphism d a b
-morphismZeroOfDeg d = Morphism d (const (Combination []))
+morphismZeroOfDeg d = Morphism d (const zeroComb)
 
 morphismZero :: Num d => UMorphism d a b
 morphismZero = morphismZeroOfDeg 0
@@ -93,14 +95,14 @@ instance Show d => Show (UMorphism d a b) where
   show (Morphism d f) = "Morphism of degree " ++ show d
 
 instance Num d => Constrained.Semigroupoid (UMorphism d) where
-  type Object (UMorphism d) a = Eq a
+  type Object (UMorphism d) a = Ord a
 
-  (Morphism d2 f2) . (Morphism d1 f1) = Morphism (d1 + d2) (incl (join @(Constrained.Sub Eq (->))) . fmap f2 . f1)
+  (Morphism d2 f2) . (Morphism d1 f1) = Morphism (d1 + d2) (incl (join @(Constrained.Sub Ord (->))) . fmap f2 . f1)
 
 instance Num d => Constrained.Category (UMorphism d) where
-  id = Morphism 0 (\x -> Combination [(1, x)])
+  id = Morphism 0 singleComb
 
-instance (Num d, Eq b) => Num (UMorphism d a b) where
+instance (Num d, Ord b) => Num (UMorphism d a b) where
   fromInteger 0 = morphismZero
   fromInteger _ = error "Morphism: fromInteger"
 
@@ -117,13 +119,13 @@ instance (Num d, Eq b) => Num (UMorphism d a b) where
 data ClosedMorphism a b = ClosedMorphism a (Morphism a b) b
 
 instance Constrained.Semigroupoid ClosedMorphism where
-  type Object ClosedMorphism o = Eq (Basis o)
+  type Object ClosedMorphism o = Ord (Basis o)
   (ClosedMorphism _ n c) . (ClosedMorphism a m _) = ClosedMorphism a (n . m) c
 
 data ChainGroup a = ChainGroup Int a
 newtype ChainGroupElt a = ChainGroupElt (Combination a)
 
-instance (ChainComplex a) => Group (ChainGroup a) where
+instance (ChainComplex a, Ord (Basis a)) => Group (ChainGroup a) where
   type Element (ChainGroup a) = ChainGroupElt (Basis a)
   prod _ = coerce ((+) :: Chain a -> Chain a -> Chain a)
   inv _ = coerce (negate :: Chain a -> Chain a)
@@ -137,8 +139,10 @@ toChainGrpElt a n cs = AbGroupPresElt $ M.fromList 1 (length r) (fmap (fromInteg
   where
     r = basis a n
 
+-- TODO ensure ascending list so that this can be faster?
 fromChainGrpElt :: (FiniteType a) => a -> Int -> AbGroupPresElt -> Chain a
-fromChainGrpElt a n (AbGroupPresElt m) = Combination $ filter (\(c, _) -> c /= 0) $ zip (fromIntegral <$> M.toList m) (basis a n)
+fromChainGrpElt a n (AbGroupPresElt m) = normalise $ Combination $
+  Map.fromList $ zip (basis a n) (fromIntegral <$> M.toList m)
 
 chainGroup :: FiniteType a => a -> Int -> AbGroupPres
 -- chainGroup a n | n < 0 = zero

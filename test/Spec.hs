@@ -78,7 +78,7 @@ spec = do
   describe "products" $
     describe "S³ × S²" $ testProduct 7 (Sphere 3) (Sphere 2)
 
-  describe "efficient K(ℤ/2,1)" $ do -- TODO looks stuck in a loop
+  describe "efficient K(ℤ/2,1)" $ do
     let p = KZmod2_1
     describe "SSet" $
       SSetProperties.check 5 p

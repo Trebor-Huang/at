@@ -10,6 +10,7 @@ module Math.Algebra.ChainComplex.TwistedTensor where
 
 import Control.Category.Constrained
 import Data.Coerce
+import Math.Algebra.Combination (coerceCombination)
 import Math.Algebra.ChainComplex
 import Math.Algebra.ChainComplex.Algebra
 import Math.Algebra.ChainComplex.Coalgebra
@@ -21,7 +22,7 @@ import Prelude hiding (id, return, (.))
 data TwistedTensor a b = TwistedTensor a b (Morphism a b)
 
 newtype TwistedBasis a = TwistedBasis a
-  deriving (Eq)
+  deriving (Eq, Ord)
 
 perturbationForCochain :: (Coalgebra a, Algebra b, Eq (Basis a), Eq (Basis b)) => a -> b -> Morphism a b -> Morphism (Tensor a b) (Tensor a b)
 perturbationForCochain a b tauMor = delta
@@ -48,7 +49,7 @@ instance (Coalgebra a, Algebra b, Eq (Basis b), Eq (Basis a)) => ChainComplex (T
   isBasis (TwistedTensor a b _) (TwistedBasis (s, t)) = isBasis a s && isBasis b t
   degree (TwistedTensor a b _) (TwistedBasis s) = degree (Tensor a b) s
 
-  diff (TwistedTensor a b tauMor) = coerce $ diff (Perturbed (Tensor a b) (perturbationForCochain a b tauMor))
+  diff (TwistedTensor a b tauMor) = coerceCombination $ diff (Perturbed (Tensor a b) (perturbationForCochain a b tauMor))
 
 toTwisted :: (Coalgebra a, Algebra b, Eq (Basis a), Eq (Basis b)) => Perturbed (Tensor a b) -> TwistedTensor a b
 toTwisted (Perturbed (Tensor a b) delta) = TwistedTensor a b (cochainForPerturbation a b delta)

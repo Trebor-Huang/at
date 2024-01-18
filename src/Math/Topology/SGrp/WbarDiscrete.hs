@@ -13,7 +13,8 @@ import Math.Topology.SSet
 -- If a is a discrete group, things get much easier.
 newtype WbarDiscrete a = WbarDiscrete a
 
-instance (Group a, Eq (Element a)) => SSet (WbarDiscrete a) where
+-- The group need not be ordered, i.e. the order doesn't respect multiplication
+instance (Group a, Ord (Element a)) => SSet (WbarDiscrete a) where
   -- A non-degenerate n-simplex is a list of n non-identity elements
   -- of `a`
   type GeomSimplex (WbarDiscrete a) = [Element a]
@@ -46,18 +47,18 @@ unnormalise a (FormalDegen g d) = helper (unit a) g (dsymbol d)
     helper u [] _ = error "WbarDiscrete unnormalise: impossible"
     helper u (x:xs) (i:is) = replicate (i-1) u ++ x : helper u xs is
 
-instance (Group a, Eq (Element a)) => Pointed (WbarDiscrete a) where
+instance (Group a, Ord (Element a)) => Pointed (WbarDiscrete a) where
   basepoint (WbarDiscrete a) = []
 
-instance (Group a, Eq (Element a)) => ZeroReduced (WbarDiscrete a)
+instance (Group a, Ord (Element a)) => ZeroReduced (WbarDiscrete a)
 
-instance (FiniteGroup a, Eq (Element a)) => FiniteType (WbarDiscrete a) where
+instance (FiniteGroup a, Ord (Element a)) => FiniteType (WbarDiscrete a) where
   geomBasis (WbarDiscrete a) i = sequence (replicate i nonident)
     where
       nonident = filter (\x -> x /= unit a) (elements a)
 
-instance (Abelian a, Eq (Element a)) => S.SGrp (WbarDiscrete a) where
+instance (Abelian a, Ord (Element a)) => S.SGrp (WbarDiscrete a) where
   prodMor (WbarDiscrete a) = Morphism $ \(s, t) -> normalise a $ fmap (uncurry (prod a)) (zip (unnormalise a s) (unnormalise a t))
   invMor (WbarDiscrete a) = Morphism $ \s -> nonDegen $ fmap (inv a) s
 
-instance (Abelian a, Eq (Element a)) => S.SAb (WbarDiscrete a)
+instance (Abelian a, Ord (Element a)) => S.SAb (WbarDiscrete a)

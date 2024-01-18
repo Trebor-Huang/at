@@ -18,6 +18,7 @@ Plan
 - Tweak stuff and see what happens (get faster?)
 - Write a series of accessible articles about it (where do I put it?)
 - Take on some unfinished plans of the original repo
+- Try to modularize stuff, such as stop exposing `Combination` internals
 
 References
 ----------

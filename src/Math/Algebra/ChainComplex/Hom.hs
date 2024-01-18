@@ -4,6 +4,7 @@
 module Math.Algebra.ChainComplex.Hom where
 
 import qualified Control.Category.Constrained as Constrained
+import qualified Data.Map.Lazy as Map
 
 import Prelude hiding (Bounded, id, (.))
 
@@ -15,7 +16,7 @@ data Hom a b = Hom a b
 
 -- Looks weird, but I think this is right, for bounded b.
 data HomBasis a b = HomBasis a b
-  deriving (Eq)
+  deriving (Eq, Ord)
   deriving (Show)
 
 instance (FiniteType a, ChainComplex b) => ChainComplex (Hom a b) where
@@ -27,9 +28,11 @@ instance (FiniteType a, ChainComplex b) => ChainComplex (Hom a b) where
 
   -- This is obviously far less efficient than having a function Combination -> Combination
   diff (Hom a b) = Morphism (-1) $ \(HomBasis s t) ->
-    let n = degree (Hom a b) (HomBasis s t)
-     in fmap (HomBasis s) (diff b `onBasis` t)
-          + kozulRule (n + 1) (Combination $ fmap (\s' -> (diff a `onBasis` s' `coeffOf` s, HomBasis s' t)) (basis a (n + 1)))
+    let n = degree (Hom a b) (HomBasis s t) in
+    (HomBasis s <$> diff b `onBasis` t) +
+    (kozulRule negate (n + 1) $ Combination $ Map.fromList $
+      fmap (\s' -> (HomBasis s' t, diff a `onBasis` s' `coeffOf` s))
+        (basis a (n + 1)))
 
 instance (FiniteType a, FiniteType b, Bounded b) => FiniteType (Hom a b) where
   dim (Hom a b) n = sum $ (\y -> dim b y * dim a (y - n)) <$> amplitude b
@@ -42,8 +45,9 @@ instance (FiniteType a, FiniteType b, Bounded b) => FiniteType (Hom a b) where
 -- Just degree 0 for now
 homcontramap :: (FiniteType a, ChainComplex a', ChainComplex b) => a -> a' -> Morphism a a' -> Morphism (Hom a' b) (Hom a b)
 homcontramap a a' m = Morphism 0 $ \(HomBasis s' t) ->
-  let abasis = basis a (degree a' s')
-   in Combination $ normalise $ fmap (\s -> (m `onBasis` s `coeffOf` s', HomBasis s t)) abasis
+  let abasis = basis a (degree a' s') in
+  normalise $ Combination $ Map.fromListWith (+) $
+    fmap (\s -> (HomBasis s t, m `onBasis` s `coeffOf` s')) abasis
 
 hommap :: Morphism b b' -> Morphism (Hom a b) (Hom a b')
 hommap m = Morphism 0 $ \(HomBasis s t) -> HomBasis s <$> m `onBasis` t
@@ -52,7 +56,8 @@ instance Constrained.Functor (UMorphism Int) (UMorphism Int) (HomBasis a) where
   fmap m = Morphism 0 $ \(HomBasis s t) -> HomBasis s <$> m `onBasis` t
 
 homcounit :: (Eq (Basis a)) => Morphism (Tensor (Hom a b) a) b
-homcounit = Morphism 0 $ \(HomBasis s t, s') -> if s == s' then singleComb t else Combination []
+homcounit = Morphism 0 $ \(HomBasis s t, s') ->
+  if s == s' then singleComb t else zeroComb
 
 homunit :: (Bounded b) => Morphism a (Hom b (Tensor a b))
 homunit = Morphism 0 $ \s -> undefined

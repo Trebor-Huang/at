@@ -20,8 +20,7 @@ instance Show a => Show (NChains a) where
   show (NChains a) = "N(" ++ show a ++ ")"
 
 newtype BasisSimplex a = BasisSimplex a
-  deriving (Eq) via a
-  deriving (Show) via a
+  deriving (Eq, Ord, Show) via a
 
 instance SSet a => CC.ChainComplex (NChains a) where
   type Basis (NChains a) = BasisSimplex (GeomSimplex a)
@@ -30,9 +29,9 @@ instance SSet a => CC.ChainComplex (NChains a) where
 
   degree (NChains a) = coerce $ geomSimplexDim a
 
-  diff (NChains a) = CC.Morphism (-1) (coerce act)
+  diff (NChains a) = CC.Morphism (-1) (coerceCombination act)
     where
-      act v = sum [Combination [(c, s)] | (c, FormalDegen s d) <- zip signs $ geomFaces a v, d == NonDegen]
+      act v = sum [c .* singleComb s | (c, FormalDegen s d) <- zip signs $ geomFaces a v, d == NonDegen]
       signs = cycle [1, -1]
 
 instance FiniteType a => CC.FiniteType (NChains a) where
@@ -48,4 +47,4 @@ instance Functor UMorphism (CC.UMorphism Int) BasisSimplex where
     if d == NonDegen then
       singleComb (BasisSimplex g)
     else
-      Combination []
+      zeroComb

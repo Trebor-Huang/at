@@ -30,7 +30,7 @@ instance (Group a, Ord (Element a)) => SSet (WbarDiscrete a) where
       underlying [s] 1 = []
       underlying (s : s' : ss) 1 = prod a s s' : ss
       underlying (s : ss) i = s : underlying ss (i - 1)
-      underlying _ _ = error "WbarDiscrete geomFace: impossible" -- can't happen
+      underlying _ _ = error "WbarDiscrete geomFace: impossible"
 
 normalise :: (Group a, Eq (Element a)) => a -> [Element a] -> Simplex (WbarDiscrete a)
 normalise a [] = nonDegen []

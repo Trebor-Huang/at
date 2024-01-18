@@ -22,6 +22,7 @@ newtype RPnSimplex = RPnSimplex (GeomSimplex (Skeleton KZmod2_1))
 
 instance SSet RPn where
   type GeomSimplex RPn = RPnSimplex
+  -- TODO what? you can't...
   isGeomSimplex (RPn n) = coerce (isGeomSimplex (Skeleton n KZmod2_1))
   geomSimplexDim (RPn n) = coerce (geomSimplexDim (Skeleton n KZmod2_1))
   geomFace (RPn n) = coerce (geomFace (Skeleton n KZmod2_1))

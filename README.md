@@ -16,9 +16,13 @@ Plan
 ----
 
 - Tweak stuff and see what happens (get faster?)
+  - [X] I changed the free abelian group implementation to use `Data.Map.Lazy`, and it did get a bit faster on my computer.
 - Write a series of accessible articles about it (where do I put it?)
+- Dependent types?
 - Take on some unfinished plans of the original repo
-- Try to modularize stuff, such as stop exposing `Combination` internals
+  - [ ] inverse of the Hurewicz map
+- Try to modularize stuff
+  - [X] stop exposing `Combination` internals
 
 References
 ----------

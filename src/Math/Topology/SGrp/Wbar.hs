@@ -49,21 +49,18 @@ instance (SGrp g) => SSet (Wbar g) where
 
   geomSimplexDim _ (WbarSimplex ss) = length ss
 
-  geomFace _ (WbarSimplex []) _ = undefined
   -- TODO: need to make sure this matches with Kenzo's conventions,
   -- multiplying on which side (for abelian groups of course it
   -- doesn't matter)
   geomFace (Wbar g) (WbarSimplex ss) i = normalise g (underlying ss i)
     where
-      underlying ss i
-        | i == 0 = tail ss
-        | i == 1 && length ss == 1 = []
-        | i == 1 =
-          let (s : s' : rest) = ss
-           in (prodMor g `onSimplex` prodNormalise (face g s 0, s')) : rest
-        | otherwise =
-          let (s : rest) = ss
-           in (face g s (i - 1)) : underlying rest (i - 1)
+      underlying []          _ = error "Wbar geomFace: impossible"
+      underlying (s:ss)      0 = ss
+      underlying [s]         1 = []
+      underlying (s:s':rest) 1 =
+        (prodMor g `onSimplex` prodNormalise (face g s 0, s')) : rest
+      underlying (s:rest)    i =
+        face g s (i - 1) : underlying rest (i - 1)
 
 -- TODO: there are probably efficient algorithms for this in terms of bit fields.
 -- 1. Create a bit field marking which positions are the unit
@@ -184,6 +181,6 @@ instance (SAb g, Effective g, ZeroReduced g, Algebra (Model g)) => Effective (Wb
 -- contractible.
 
 canonicalTwist :: (SGrp g) => g -> Twist (Wbar g) g
-canonicalTwist g = Twist $ \(WbarSimplex s) -> case length s of
-  0 -> basepointSimplex g
-  _ -> head s
+canonicalTwist g = Twist $ \(WbarSimplex s) -> case s of
+  [] -> basepointSimplex g
+  (s0:_) -> s0

@@ -4,6 +4,7 @@ import Math.Algebra.ChainComplex
 import Math.Algebra.ChainComplex.Tensor
 import Math.Topology.SSet
 import Math.Topology.SSet.Sphere
+import Math.Topology.SSet.RPn
 import Math.Topology.SGrp
 import Math.Topology.SGrp.Wbar
 import Math.Topology.SGrp.WbarDiscrete
@@ -15,6 +16,4 @@ import Math.Algebra.ChainComplex.Reduction
 
 main :: IO ()
 main = do
-  let p = Product (Sphere 3) (Sphere 2)
-  putStrLn "Starting:"
-  print (reductionG (ezReduction p) `onBasis` (BasisSimplex Cell, BasisSimplex Cell))
+  print (take 10 $ homology (Product (Sphere 3) (Sphere 2)))

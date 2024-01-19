@@ -99,7 +99,7 @@ liftA2Comb f (Combination as) (Combination bs) = normalise $ Combination $ -- go
 
 -- TODO: generalise via Constrained.Traversable
 traverseComb :: (Ord b) => (a -> Combination b) -> [a] -> Combination [b]
-traverseComb f [] = 0
+traverseComb f [] = singleComb []
 traverseComb f (a:as) = liftA2Comb (:) (f a) (traverseComb f as)
 
 instance Ord b => Num (Combination b) where

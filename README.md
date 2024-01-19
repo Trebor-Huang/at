@@ -16,15 +16,18 @@ Plan
 ----
 
 - Tweak stuff and see what happens (get faster?)
-  - [X] I changed the free abelian group implementation to use `Data.Map.Lazy`, and it did get a bit faster on my computer.
+  - [X] Changed the representation of degeneracies.
+  - [X] Changed the free abelian group implementation to use `Data.Map.Lazy`, and it did get a bit faster on my computer.
+  - [ ] Faster smith normal form
 - Write a series of accessible articles about it (where do I put it?)
 - Dependent types?
 - Take on some unfinished plans of the original repo
-  - [ ] inverse of the Hurewicz map
 - Try to modularize stuff
   - [X] stop exposing `Combination` internals
 
 References
 ----------
 
-Will contain some good references not included in the original repo.
+- [Discrete Vector Fields and Fundamental Algebraic Topology](https://www-fourier.ujf-grenoble.fr/~sergerar/Papers/Vector-Fields.pdf). Book covering a lot of effective homology stuff, in particular DVFs.
+- [Francis Sergeraert's Talks](https://www-fourier.univ-grenoble-alpes.fr/~sergerar/Talks/).
+- [Constructive Homological Algebra and Applications](https://arxiv.org/abs/1208.3816).

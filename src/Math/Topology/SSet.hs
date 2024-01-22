@@ -222,12 +222,12 @@ class SSet a => FiniteType a where
   -- * `all isSimplex (geomBasis n)`
   geomBasis :: a -> Int -> [GeomSimplex a]
 
-someSimplices :: (SSet a) => a -> Int -> (Int -> [GeomSimplex a]) -> [Simplex a]
-someSimplices a n f | n < 0 = []
-someSimplices a n f = [FormalDegen g d | k <- [0 .. n], g <- f k, d <- allDegens n k]
+someSimplices :: (SSet a) => Int -> (Int -> [GeomSimplex a]) -> [Simplex a]
+someSimplices n f | n < 0 = []
+someSimplices n f = [FormalDegen g d | k <- [0 .. n], g <- f k, d <- allDegens n k]
 
 allSimplices :: (FiniteType a) => a -> Int -> [Simplex a]
-allSimplices a n = someSimplices a n (geomBasis a)
+allSimplices a n = someSimplices n (geomBasis a)
 
 class SSet a => Bounded a where
   amplitude :: a -> [Int]

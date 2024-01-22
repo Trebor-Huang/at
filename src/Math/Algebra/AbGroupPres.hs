@@ -28,7 +28,7 @@ instance Eq AbGroupPres where
   a == b = reduced a == reduced b
 
 -- Cokernel of the reduced matrix
-newtype AbGroupPresElt = AbGroupPresElt { eltVector :: (Matrix Integer) }
+newtype AbGroupPresElt = AbGroupPresElt { eltVector :: Matrix Integer }
 
 normaliseElt :: AbGroupPres -> Matrix Integer -> AbGroupPresElt
 normaliseElt (AbGroupPres _ d _ _) c = AbGroupPresElt $ M.fromList (M.nrows d) 1 $ fmap (uncurry doMod) pairs

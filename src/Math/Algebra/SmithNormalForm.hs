@@ -5,7 +5,7 @@ module Math.Algebra.SmithNormalForm
 where
 
 import Control.Monad
-import Control.Monad.State
+import Control.Monad.State.Strict
 import Data.List (foldl')
 import Data.Monoid (All (..))
 
@@ -36,11 +36,11 @@ foldWithIndex f s m = foldWithIndices [(i, j) | j <- [1 .. M.ncols m], i <- [1 .
 -- These keep track of a (L, M, R) decomposition of a matrix
 
 data Triple = Triple
-  { leftInverse :: Matrix Integer,
-    left :: Matrix Integer,
-    middle :: Matrix Integer,
-    right :: Matrix Integer,
-    rightInverse :: Matrix Integer
+  { leftInverse :: !(Matrix Integer),
+    left :: !(Matrix Integer),
+    middle :: !(Matrix Integer),
+    right :: !(Matrix Integer),
+    rightInverse :: !(Matrix Integer)
   }
   deriving (Show, Eq)
 
@@ -181,7 +181,8 @@ ensureAllDivide s = do
     nullifyEdging s
 
 smithNormalForm :: Matrix Integer -> Triple
-smithNormalForm m = flip execState (matrixToTriple m) $ do
+smithNormalForm m = -- trace ("Smith Normal Form of " ++ show (M.nrows m, M.ncols m)) $
+  flip execState (matrixToTriple m) $ do
   forM_ [1 .. min (M.ncols m) (M.nrows m)] $ \s -> do
     t <- get
     unless (matrixIsNull $ lowerRightBlock s $ middle t) $ do

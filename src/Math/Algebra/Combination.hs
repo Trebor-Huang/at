@@ -2,9 +2,9 @@ module Math.Algebra.Combination where
 
 import Control.Category.Constrained (join, return)
 import qualified Control.Category.Constrained as Constrained
-import Data.Map.Lazy (Map)
-import qualified Data.Map.Lazy as Map
-import Data.Map.Merge.Lazy
+import Data.Map.Strict (Map)
+import qualified Data.Map.Strict as Map
+import Data.Map.Merge.Strict
 import Unsafe.Coerce
 import Data.Maybe (fromMaybe)
 import Prelude hiding (id, return)

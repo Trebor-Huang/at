@@ -18,8 +18,8 @@ Plan
 - Tweak stuff and see what happens (get faster?)
   - [X] Changed the representation of degeneracies.
   - [X] Changed the free abelian group implementation to use `Data.Map.Lazy`, and it did get a bit faster on my computer.
-  - [ ] Faster smith normal form
-- Write a series of accessible articles about it (where do I put it?)
+  - [ ] Faster smith normal form (I think it's already pretty fast since we want the multiplier matrices, if we don't need those we can get much faster)
+- Write a series of accessible articles about it ([WIP](/exposition/Introduction.md))
 - Dependent types?
 - Take on some unfinished plans of the original repo
 - Try to modularize stuff

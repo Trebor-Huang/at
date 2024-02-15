@@ -171,7 +171,7 @@ spec = do
 
         n = 3
         ks = [-3 .. -1] ++ [1 .. 3]
-        gs = [TwistedProductSimplex (s, t) | s <- someSimplices kz1 n (\d -> if d <= 3 then sequence (replicate d ks) else []),
+        gs = [TwistedProductSimplex (s, t) | s <- someSimplices n (\d -> if d <= 3 then sequence (replicate d ks) else []),
                                              t <- allSimplices s2 n
                                            , isGeomSimplex (Product kz1 s2) (s, t)]
 
@@ -204,10 +204,10 @@ spec = do
         n = 3
         ks = [-3 .. -1] ++ [1 .. 3]
         somekz1 :: Int -> [Simplex KZ1]
-        somekz1 d = someSimplices kz1 n (\d -> if d <= 3 then sequence (replicate d ks) else [])
+        somekz1 d = someSimplices n (\d -> if d <= 3 then sequence (replicate d ks) else [])
         somegeomkz2 :: Int -> [GeomSimplex (Wbar KZ1)]
         somegeomkz2 n = filter (isGeomSimplex kz2) $ fmap WbarSimplex $ sequence $ somekz1 <$> reverse [0 .. (n - 1)]
-        somekz2 n = someSimplices kz2 n somegeomkz2
+        somekz2 n = someSimplices n somegeomkz2
         gs = [TwistedProductSimplex (s, t) | s <- somekz2 n,
                                              t <- allSimplices s3 n
                                            , isGeomSimplex (Product kz2 s3) (s, t)]

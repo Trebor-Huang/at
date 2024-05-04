@@ -19,7 +19,7 @@ Plan
   - [X] Changed the representation of degeneracies.
   - [X] Changed the free abelian group implementation to use `Data.Map.Lazy`, and it did get a bit faster on my computer.
   - [ ] Faster smith normal form (I think it's already pretty fast since we want the multiplier matrices, if we don't need those we can get much faster)
-- Write a series of accessible articles about it ([WIP](/exposition/Introduction.md))
+- Write a series of accessible articles about it ([WIP](https://trebor-huang.github.io/forest/hmlg-001K.xml))
 - Dependent types?
 - Take on some unfinished plans of the original repo
 - Try to modularize stuff
